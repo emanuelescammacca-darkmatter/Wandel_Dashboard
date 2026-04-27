@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { mockCandidates } from '../mockData';
 import StatusBadge from '../components/StatusBadge';
 import { ChannelIcon } from '../components/ChannelBadge';
@@ -36,6 +36,9 @@ function CardTitle({ children }: { children: React.ReactNode }) {
 export default function CandidateDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const listPath = location.pathname.startsWith('/candidates') ? '/candidates' : '/ai-candidates';
+  const listLabel = location.pathname.startsWith('/candidates') ? 'Candidates' : 'AI Candidates';
   const candidate = mockCandidates.find(c => c.id === id);
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -48,7 +51,7 @@ export default function CandidateDetail() {
       <div className="flex-1 flex items-center justify-center">
         <p className="text-gray-400 text-sm">
           Candidate not found.{' '}
-          <button onClick={() => navigate('/ai-candidates')} className="underline">Go back</button>
+          <button onClick={() => navigate(listPath)} className="underline">Go back</button>
         </p>
       </div>
     );
@@ -79,13 +82,13 @@ export default function CandidateDetail() {
           {/* Left: breadcrumb + avatar + name / status */}
           <div className="flex flex-col gap-3 shrink-0 min-w-45">
             <button
-              onClick={() => navigate('/ai-candidates')}
+              onClick={() => navigate(listPath)}
               className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 w-fit transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              AI Candidates
+              {listLabel}
             </button>
             <div className="flex flex-col gap-2">
               <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-lg shrink-0">
@@ -98,7 +101,7 @@ export default function CandidateDetail() {
                 <p className="text-xs text-gray-400 mt-0.5">{candidate.phoneNumber}</p>
               </div>
               <div className="flex flex-col gap-1.5">
-                <StatusBadge status={candidate.status} />
+                <StatusBadge status={candidate.employmentStatus} />
                 {candidate.analysisOutcome && (
                   <span className={`text-xs px-2 py-0.5 rounded border font-medium w-fit ${OUTCOME_STYLES[candidate.analysisOutcome]}`}>
                     {OUTCOME_LABELS[candidate.analysisOutcome]}
@@ -257,7 +260,7 @@ export default function CandidateDetail() {
                     </div>
                   }
                 />
-                <Field label="Call Status" value={<StatusBadge status={candidate.status} />} />
+                <Field label="Call Status" value={<StatusBadge status={candidate.employmentStatus} />} />
                 <Field
                   label="Analysis Outcome"
                   value={
