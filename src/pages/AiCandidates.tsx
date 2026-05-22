@@ -1,33 +1,38 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { mockCandidates, uniqueJobTitles } from '../mockData';
-import StatusBadge from '../components/StatusBadge';
-import { ChannelIcon, ChannelStack } from '../components/ChannelBadge';
-import type { Channel } from '../types';
+import PipelineStatusBadge, { PIPELINE_STATUS_OPTIONS } from '../components/PipelineStatusBadge';
+import NeedForActionBadge from '../components/NeedForActionBadge';
+import type { NeedForAction, PipelineStatus, Recruiter } from '../types';
 
-const ALL_CHANNELS: Channel[] = ['instagram', 'facebook', 'whatsapp', 'linkedin', 'website'];
-const CHANNEL_LABELS: Record<Channel, string> = {
-  instagram: 'Instagram', facebook: 'Facebook', whatsapp: 'WhatsApp', linkedin: 'LinkedIn', website: 'Website',
-};
+const ALL_RECRUITERS: Recruiter[] = ['Tanina', 'Itgel', 'Berti', 'Camilla'];
+
+function RecruiterAvatar({ name, size = 'sm' }: { name: Recruiter; size?: 'sm' | 'xs' }) {
+  const dim = size === 'xs' ? 'w-4 h-4 text-[9px]' : 'w-5 h-5 text-[10px]';
+  return (
+    <div className={`${dim} rounded-full bg-gray-100 text-gray-600 font-semibold flex items-center justify-center shrink-0`}>
+      {name.charAt(0)}
+    </div>
+  );
+}
 
 const EXPORT_COLUMNS: { key: string; label: string }[] = [
-  { key: 'firstName',        label: 'First Name' },
-  { key: 'lastName',         label: 'Last Name' },
-  { key: 'phoneNumber',      label: 'Phone Number' },
-  { key: 'touchpoints',      label: 'Points of Contact' },
-  { key: 'source',           label: 'Channel' },
-  { key: 'employmentStatus', label: 'Status' },
-  { key: 'flags',            label: 'Call Flags' },
-  { key: 'lastContactAt',    label: 'Last Contact' },
-  { key: 'aiAdoption',       label: 'AI Adoption' },
-  { key: 'createdAt',        label: 'Created Date' },
-  { key: 'analysisOutcome',  label: 'Analysis Outcome' },
+  { key: 'firstName',      label: 'First Name' },
+  { key: 'lastName',       label: 'Last Name' },
+  { key: 'phoneNumber',    label: 'Phone Number' },
+  { key: 'jobTitle',       label: 'Job Identifier' },
+  { key: 'city',           label: 'City' },
+  { key: 'pipelineStatus', label: 'Status' },
+  { key: 'needForAction',  label: 'Need for Action' },
+  { key: 'recruiter',      label: 'Recruiter' },
+  { key: 'lastContactAt',  label: 'Last Contact' },
+  { key: 'createdAt',      label: 'Created Date' },
 ];
 
-// Candidate col | Points | Channel | Status | Call Flags | Last Contact | AI Adoption | Created
-const COLS = 'grid-cols-[2fr_0.8fr_0.8fr_1.4fr_1.4fr_1.1fr_1fr_1fr]';
+// Candidate | Job Identifier | City | Status | Need for Action | Recruiter | Last Contact | Created
+const COLS = 'grid-cols-[1.8fr_1.5fr_0.9fr_1.2fr_1fr_0.9fr_0.9fr_0.9fr]';
 
-const HEADERS = ['Candidate', 'Points of Contact', 'Channel', 'Status', 'Call Flags', 'Last Contact', 'AI Adoption', 'Created'];
+const HEADERS = ['Candidate', 'Job Identifier', 'City', 'Status', 'Need for Action', 'Recruiter', 'Last Contact', 'Created'];
 
 function SearchInput({ placeholder, value, onChange, highlighted }: {
   placeholder: string; value: string; onChange: (v: string) => void; highlighted: boolean;
@@ -56,7 +61,7 @@ function SearchInput({ placeholder, value, onChange, highlighted }: {
   );
 }
 
-function ChannelMultiSelect({ selected, onChange, highlighted }: { selected: Channel[]; onChange: (v: Channel[]) => void; highlighted?: boolean }) {
+function RecruiterMultiSelect({ selected, onChange, highlighted }: { selected: Recruiter[]; onChange: (v: Recruiter[]) => void; highlighted?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -64,7 +69,7 @@ function ChannelMultiSelect({ selected, onChange, highlighted }: { selected: Cha
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
-  const toggle = (ch: Channel) => onChange(selected.includes(ch) ? selected.filter(s => s !== ch) : [...selected, ch]);
+  const toggle = (r: Recruiter) => onChange(selected.includes(r) ? selected.filter(s => s !== r) : [...selected, r]);
   return (
     <div ref={ref} className="relative">
       <button
@@ -73,20 +78,28 @@ function ChannelMultiSelect({ selected, onChange, highlighted }: { selected: Cha
           highlighted ? 'border-indigo-500 ring-1 ring-indigo-200' : 'border-gray-200 hover:border-gray-300'
         }`}
       >
-        {selected.length === 0
-          ? <span className="text-gray-400 text-xs">All channels</span>
-          : <ChannelStack channels={selected} />}
+        {selected.length === 0 ? (
+          <span className="text-gray-400 text-xs">All recruiters</span>
+        ) : (
+          <div className="flex items-center">
+            {selected.map((r, i) => (
+              <div key={r} style={{ marginLeft: i > 0 ? -6 : 0, zIndex: selected.length - i }} className="relative">
+                <RecruiterAvatar name={r} />
+              </div>
+            ))}
+          </div>
+        )}
         <svg className="w-3 h-3 text-gray-400 ml-auto shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
       {open && (
-        <div className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1 w-44">
-          {ALL_CHANNELS.map(ch => (
-            <button key={ch} onClick={() => toggle(ch)} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 text-left">
-              <ChannelIcon channel={ch} />
-              <span className="text-sm text-gray-700">{CHANNEL_LABELS[ch]}</span>
-              {selected.includes(ch) && (
+        <div className="absolute top-full mt-1 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1 w-44">
+          {ALL_RECRUITERS.map(r => (
+            <button key={r} onClick={() => toggle(r)} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 text-left">
+              <RecruiterAvatar name={r} />
+              <span className="text-sm text-gray-700">{r}</span>
+              {selected.includes(r) && (
                 <svg className="w-3.5 h-3.5 text-gray-500 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                 </svg>
@@ -108,47 +121,36 @@ const getSelectCls = (highlighted: boolean) =>
     highlighted ? 'border-indigo-500 ring-1 ring-indigo-200' : 'border-gray-200 focus:border-indigo-400'
   }`;
 
-function AiAdoptionBadge({ value }: { value: 'high' | 'medium' | 'low' | null }) {
-  if (!value) return <span className="text-xs text-gray-300">—</span>;
-  const cls = value === 'high'
-    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    : value === 'medium'
-    ? 'bg-amber-50 text-amber-700 border-amber-200'
-    : 'bg-gray-50 text-gray-500 border-gray-200';
-  const label = value === 'high' ? 'High' : value === 'medium' ? 'Medium' : 'Low';
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${cls}`}>
-      {label}
-    </span>
-  );
-}
-
 export default function AiCandidates() {
   const navigate = useNavigate();
   const location = useLocation();
   const basePath = location.pathname.startsWith('/candidates') ? '/candidates' : '/ai-candidates';
 
-  const [phoneSearch, setPhoneSearch]         = useState('');
-  const [firstNameSearch, setFirstNameSearch] = useState('');
-  const [lastNameSearch, setLastNameSearch]   = useState('');
-  const [dateFrom, setDateFrom]               = useState('');
-  const [dateTo, setDateTo]                   = useState('');
-  const [jobTitleFilter, setJobTitleFilter]   = useState('');
-  const [channelFilter, setChannelFilter]     = useState<Channel[]>([]);
-  const [exportOpen, setExportOpen]           = useState(false);
-  const [selectedCols, setSelectedCols]       = useState<Set<string>>(new Set(EXPORT_COLUMNS.map(c => c.key)));
-  const [columnOrder, setColumnOrder]         = useState<string[]>(EXPORT_COLUMNS.map(c => c.key));
+  const [phoneSearch, setPhoneSearch]               = useState('');
+  const [firstNameSearch, setFirstNameSearch]       = useState('');
+  const [lastNameSearch, setLastNameSearch]         = useState('');
+  const [dateFrom, setDateFrom]                     = useState('');
+  const [dateTo, setDateTo]                         = useState('');
+  const [jobTitleFilter, setJobTitleFilter]         = useState('');
+  const [recruiterFilter, setRecruiterFilter]       = useState<Recruiter[]>([]);
+  const [statusFilter, setStatusFilter]             = useState<PipelineStatus | ''>('');
+  const [needForActionFilter, setNeedForActionFilter] = useState<NeedForAction | ''>('');
+  const [exportOpen, setExportOpen]                 = useState(false);
+  const [selectedCols, setSelectedCols]             = useState<Set<string>>(new Set(EXPORT_COLUMNS.map(c => c.key)));
+  const [columnOrder, setColumnOrder]               = useState<string[]>(EXPORT_COLUMNS.map(c => c.key));
 
   const filtered = useMemo(() => mockCandidates.filter(c => {
-    if (phoneSearch     && !c.phoneNumber.includes(phoneSearch)) return false;
-    if (firstNameSearch && !c.firstName.toLowerCase().includes(firstNameSearch.toLowerCase())) return false;
-    if (lastNameSearch  && !c.lastName.toLowerCase().includes(lastNameSearch.toLowerCase())) return false;
-    if (channelFilter.length > 0 && !channelFilter.includes(c.source)) return false;
-    if (jobTitleFilter  && c.jobTitle !== jobTitleFilter) return false;
+    if (phoneSearch         && !c.phoneNumber.includes(phoneSearch)) return false;
+    if (firstNameSearch     && !c.firstName.toLowerCase().includes(firstNameSearch.toLowerCase())) return false;
+    if (lastNameSearch      && !c.lastName.toLowerCase().includes(lastNameSearch.toLowerCase())) return false;
+    if (recruiterFilter.length > 0 && (!c.recruiter || !recruiterFilter.includes(c.recruiter))) return false;
+    if (jobTitleFilter      && c.jobTitle !== jobTitleFilter) return false;
+    if (statusFilter        && c.pipelineStatus !== statusFilter) return false;
+    if (needForActionFilter && c.needForAction  !== needForActionFilter) return false;
     if (dateFrom && new Date(c.createdAt) < new Date(dateFrom)) return false;
     if (dateTo   && new Date(c.createdAt) > new Date(dateTo)) return false;
     return true;
-  }), [phoneSearch, firstNameSearch, lastNameSearch, channelFilter, jobTitleFilter, dateFrom, dateTo]);
+  }), [phoneSearch, firstNameSearch, lastNameSearch, recruiterFilter, jobTitleFilter, statusFilter, needForActionFilter, dateFrom, dateTo]);
 
   const toggleCol = (key: string) => {
     setSelectedCols(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
@@ -210,7 +212,17 @@ export default function AiCandidates() {
             <option value="">All job titles</option>
             {uniqueJobTitles.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
-          <ChannelMultiSelect selected={channelFilter} onChange={setChannelFilter} highlighted={exportOpen} />
+          <select className={getSelectCls(exportOpen)} value={statusFilter} onChange={e => setStatusFilter(e.target.value as PipelineStatus | '')}>
+            <option value="">All statuses</option>
+            {PIPELINE_STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <select className={getSelectCls(exportOpen)} value={needForActionFilter} onChange={e => setNeedForActionFilter(e.target.value as NeedForAction | '')}>
+            <option value="">All actions</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+          <RecruiterMultiSelect selected={recruiterFilter} onChange={setRecruiterFilter} highlighted={exportOpen} />
 
           {/* ── Export ── */}
           <div className="relative shrink-0">
@@ -306,35 +318,38 @@ export default function AiCandidates() {
                     <p className="text-xs text-gray-400 truncate">{c.phoneNumber}</p>
                   </div>
                 </div>
-                {/* Points of Contact */}
-                <div className="py-3 flex items-center">
-                  <span className="text-sm text-gray-700 font-medium">{c.touchpoints}</span>
+                {/* Job Identifier */}
+                <div className="py-3 flex items-center min-w-0 pr-2">
+                  <span className="text-sm text-gray-700 truncate">{c.jobTitle}</span>
                 </div>
-                {/* Channel */}
-                <div className="py-3 flex items-center">
-                  <ChannelIcon channel={c.source} size="md" />
+                {/* City */}
+                <div className="py-3 flex items-center min-w-0 pr-2">
+                  <span className="text-sm text-gray-700 truncate">{c.city ?? '—'}</span>
                 </div>
                 {/* Status */}
                 <div className="py-3 flex items-center">
-                  <StatusBadge status={c.employmentStatus} />
+                  <PipelineStatusBadge status={c.pipelineStatus} />
                 </div>
-                {/* Call Flags */}
-                <div className="py-3 flex items-center gap-1 flex-wrap">
-                  {c.flags.length === 0
-                    ? <span className="text-xs text-gray-300">—</span>
-                    : c.flags.map(flag => (
-                      <span key={flag} className="text-[11px] text-gray-500 border border-gray-200 bg-gray-50 px-1.5 py-0.5 rounded whitespace-nowrap">
-                        {flag}
-                      </span>
-                    ))}
+                {/* Need for Action */}
+                <div className="py-3 flex items-center">
+                  <NeedForActionBadge value={c.needForAction} />
+                </div>
+                {/* Recruiter */}
+                <div className="py-3 flex items-center min-w-0 pr-2">
+                  {c.recruiter ? (
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-semibold flex items-center justify-center shrink-0">
+                        {c.recruiter.charAt(0)}
+                      </div>
+                      <span className="text-sm text-gray-700 truncate">{c.recruiter}</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-300">—</span>
+                  )}
                 </div>
                 {/* Last Contact */}
                 <div className="py-3 flex items-center">
                   <span className="text-xs text-gray-400">{c.lastContactAt ? fmt(c.lastContactAt) : '—'}</span>
-                </div>
-                {/* AI Adoption */}
-                <div className="py-3 flex items-center">
-                  <AiAdoptionBadge value={c.aiAdoption} />
                 </div>
                 {/* Created */}
                 <div className="py-3 flex items-center">
