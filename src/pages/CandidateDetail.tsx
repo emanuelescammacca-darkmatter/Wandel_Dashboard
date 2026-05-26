@@ -503,11 +503,41 @@ export default function CandidateDetail() {
     setCallAnalysis(s => ({ ...s, [key]: v }));
   const [transcriptSummary, setTranscriptSummary] = useState(candidate?.transcriptSummary ?? '');
 
-  // Transcript audio + notes
-  const [isPlaying, setIsPlaying]   = useState(false);
-  const [notes, setNotes]           = useState('');
-  const [notesSaved, setNotesSaved] = useState(false);
+  // Transcript audio
+  const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Internal notes — list of entries with timestamps
+  type Note = { id: string; createdAt: string; content: string };
+  const [notes, setNotes] = useState<Note[]>([
+    {
+      id: 'n1',
+      createdAt: '2026-04-18T09:14:00Z',
+      content: 'Erstkontakt gut. Kandidat zeigt klares Interesse, fragt nach genauen Aufgaben und Standort.',
+    },
+    {
+      id: 'n2',
+      createdAt: '2026-04-22T15:42:00Z',
+      content: 'Rückruf vereinbart für Donnerstag 14:00. CV nachgefordert.',
+    },
+  ]);
+  const [noteDraft, setNoteDraft] = useState('');
+  const addNote = () => {
+    const content = noteDraft.trim();
+    if (!content) return;
+    setNotes(prev => [
+      ...prev,
+      { id: `n${Date.now()}`, createdAt: new Date().toISOString(), content },
+    ]);
+    setNoteDraft('');
+  };
+  const deleteNote = (id: string) =>
+    setNotes(prev => prev.filter(n => n.id !== id));
+  const fmtNoteDate = (iso: string) =>
+    new Date(iso).toLocaleString('de-DE', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
 
   if (!candidate) {
     return (
@@ -525,11 +555,6 @@ export default function CandidateDetail() {
     if (isPlaying) audioRef.current?.pause();
     else audioRef.current?.play();
     setIsPlaying(p => !p);
-  };
-
-  const handleSaveNotes = () => {
-    setNotesSaved(true);
-    setTimeout(() => setNotesSaved(false), 2000);
   };
 
   const totalSeconds = candidate.transcript ? candidate.transcript.length * 7 : 0;
@@ -841,21 +866,75 @@ export default function CandidateDetail() {
           {/* Notes */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col">
             <CardTitle>Internal Notes</CardTitle>
-            <div className="flex flex-col flex-1 p-5 gap-3 overflow-hidden">
-              <textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder="Add internal notes about this candidate..."
-                className="flex-1 w-full resize-none text-sm text-gray-700 placeholder-gray-300 border border-gray-200 rounded-lg p-3 focus:outline-none focus:border-indigo-300 leading-relaxed"
-              />
-              <button
-                onClick={handleSaveNotes}
-                className={`w-full py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${
-                  notesSaved ? 'bg-emerald-600 text-white' : 'bg-gray-800 hover:bg-gray-700 text-white'
-                }`}
-              >
-                {notesSaved ? 'Saved ✓' : 'Save Notes'}
-              </button>
+            <div className="flex flex-col flex-1 overflow-hidden">
+
+              {/* List of saved notes */}
+              <div className="flex-1 overflow-y-auto px-5 py-3 flex flex-col gap-2.5">
+                {notes.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center text-xs text-gray-300">
+                    No notes yet
+                  </div>
+                ) : (
+                  notes.map(n => (
+                    <div
+                      key={n.id}
+                      className="group border border-gray-200 rounded-lg px-3 py-2 bg-gray-50/40 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                          {fmtNoteDate(n.createdAt)}
+                        </span>
+                        <button
+                          onClick={() => deleteNote(n.id)}
+                          title="Delete note"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-red-500"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
+                        {n.content}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* New note input — Enter saves, Shift+Enter = newline, blur also saves */}
+              <div className="border-t border-gray-100 p-3 shrink-0 bg-white">
+                <div className="relative">
+                  <textarea
+                    value={noteDraft}
+                    onChange={e => setNoteDraft(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        addNote();
+                      }
+                    }}
+                    onBlur={() => { if (noteDraft.trim()) addNote(); }}
+                    rows={2}
+                    placeholder="Write a note and press Enter to save…"
+                    className="w-full resize-none text-sm text-gray-700 placeholder-gray-300 border border-gray-200 rounded-lg pl-3 pr-9 py-2.5 focus:outline-none focus:border-indigo-300 leading-relaxed"
+                  />
+                  {noteDraft.trim() && (
+                    <button
+                      onClick={addNote}
+                      title="Save note (Enter)"
+                      className="absolute right-2 bottom-2 w-6 h-6 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-300 mt-1.5 px-1">
+                  Enter saves · Shift+Enter for new line
+                </p>
+              </div>
             </div>
           </div>
         </div>
