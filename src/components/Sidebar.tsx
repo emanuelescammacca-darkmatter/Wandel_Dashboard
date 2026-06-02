@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import wandelLogo from '../assets/wandel-logo.png';
 
@@ -21,6 +21,11 @@ const Icons = {
   globe:      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg>,
   users:      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
   logs:       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
+  plus:       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 5v14m-7-7h14" /></svg>,
+  dashboard:  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5" strokeWidth={1.6} /><rect x="14" y="3" width="7" height="7" rx="1.5" strokeWidth={1.6} /><rect x="3" y="14" width="7" height="7" rx="1.5" strokeWidth={1.6} /><rect x="14" y="14" width="7" height="7" rx="1.5" strokeWidth={1.6} /></svg>,
+  sparkles:   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9L18 14z" /></svg>,
+  one:        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5" strokeWidth={1.6} /><text x="12" y="16.2" textAnchor="middle" fontSize="11" fontWeight="700" fill="currentColor" stroke="none">1</text></svg>,
+  two:        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5" strokeWidth={1.6} /><text x="12" y="16.2" textAnchor="middle" fontSize="11" fontWeight="700" fill="currentColor" stroke="none">2</text></svg>,
 };
 
 // ── Panel toggle icons ────────────────────────────────────────────────────────
@@ -43,14 +48,17 @@ const PanelOpen = (
 
 // ── Nav sections ──────────────────────────────────────────────────────────────
 
-const NAV_SECTIONS = [
+type NavChild = { label: string; path: string };
+type NavItem = { label: string; path: string; icon: ReactNode; children?: NavChild[] };
+type NavSection = { label: string; items: NavItem[] };
+
+const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Recruitment',
     items: [
       { label: 'Candidates',      path: '/candidates',      icon: Icons.candidates },
       { label: 'Positions',       path: '/positions',       icon: Icons.positions },
       { label: 'Employers',       path: '/employers',       icon: Icons.employers },
-      { label: 'Candidate Leads', path: '/candidate-leads', icon: Icons.leads },
     ],
   },
   {
@@ -71,18 +79,27 @@ const NAV_SECTIONS = [
     ],
   },
   {
-    label: 'Configuration',
+    label: 'Operations - Clients',
     items: [
-      { label: 'Position Config',    path: '/position-configuration', icon: Icons.settings },
-      { label: 'Course Proficiency', path: '/course-proficiency',     icon: Icons.book },
-      { label: 'Language Config',    path: '/language-configuration', icon: Icons.globe },
+      {
+        label: 'Ask Sophia',
+        path: '/ask-sophia',
+        icon: Icons.sparkles,
+        children: [
+          { label: 'Senior Nurse – Berlin',    path: '/ask-sophia/senior-nurse-berlin' },
+          { label: 'Warehouse Lead – Hamburg', path: '/ask-sophia/warehouse-lead-hamburg' },
+          { label: 'Sales Rep – Munich',       path: '/ask-sophia/sales-rep-munich' },
+        ],
+      },
+      { label: 'Dashboard', path: '/dashboard', icon: Icons.dashboard },
     ],
   },
   {
-    label: 'System',
+    label: 'Positions - Clients',
     items: [
-      { label: 'User Management', path: '/users', icon: Icons.users },
-      { label: 'Logs',            path: '/logs',  icon: Icons.logs },
+      { label: 'Position X',   path: '/clients/positions',    icon: Icons.one },
+      { label: 'Position 2',   path: '/clients/positions-2',  icon: Icons.two },
+      { label: 'New Position', path: '/clients/new-position', icon: Icons.plus },
     ],
   },
 ];
@@ -91,6 +108,9 @@ const NAV_SECTIONS = [
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const toggleExpand = (path: string) =>
+    setExpanded((prev) => ({ ...prev, [path]: !prev[path] }));
 
   return (
     <aside
@@ -125,7 +145,7 @@ export default function Sidebar() {
       </div>
 
       {/* ── Nav ── */}
-      <nav className={`flex-1 pb-3 ${collapsed ? 'px-1' : 'px-2'}`}>
+      <nav className={`flex-1 min-h-0 pb-3 sidebar-scroll ${collapsed ? 'overflow-visible px-1' : 'overflow-y-auto px-2'}`}>
         {NAV_SECTIONS.map((section) => (
           <div key={section.label} className="mt-5">
 
@@ -139,44 +159,89 @@ export default function Sidebar() {
             )}
 
             <div className="flex flex-col gap-px">
-              {section.items.map((item) => (
-                <div key={item.path} className="relative group/nav">
-                  <NavLink
-                    to={item.path}
-                    className={({ isActive }) =>
-                      `flex items-center rounded-md transition-colors ${
-                        collapsed
-                          ? 'justify-center w-8 h-8 mx-auto'
-                          : 'gap-2.5 px-2.5 py-1.75'
-                      } ${
-                        isActive
-                          ? 'bg-white/10 text-white'
-                          : 'text-white/65 hover:text-white/95 hover:bg-white/6'
-                      }`
-                    }
-                  >
-                    <span className={`shrink-0 ${collapsed ? 'w-4.5 h-4.5' : 'w-4.25 h-4.25'}`}>
-                      {item.icon}
-                    </span>
-                    {!collapsed && (
-                      <span className="text-[13.5px] font-[450] truncate leading-none">{item.label}</span>
-                    )}
-                  </NavLink>
+              {section.items.map((item) => {
+                const isOpen = !!expanded[item.path];
+                const hasChildren = !!item.children && !collapsed;
+                return (
+                  <div key={item.path} className="relative">
+                    <div className="relative group/nav">
+                      <NavLink
+                        to={item.path}
+                        className={({ isActive }) =>
+                          `flex items-center rounded-md transition-colors ${
+                            collapsed
+                              ? 'justify-center w-8 h-8 mx-auto'
+                              : 'gap-2.5 px-2.5 py-1.75'
+                          } ${hasChildren ? 'pr-7' : ''} ${
+                            isActive
+                              ? 'bg-white/10 text-white'
+                              : 'text-white/65 hover:text-white/95 hover:bg-white/6'
+                          }`
+                        }
+                      >
+                        <span className={`shrink-0 ${collapsed ? 'w-4.5 h-4.5' : 'w-4.25 h-4.25'}`}>
+                          {item.icon}
+                        </span>
+                        {!collapsed && (
+                          <span className="text-[13.5px] font-[450] truncate leading-none">{item.label}</span>
+                        )}
+                      </NavLink>
 
-                  {collapsed && (
-                    <div className="
-                      absolute left-full top-1/2 -translate-y-1/2 ml-1.5
-                      bg-neutral-600/75 text-white/90 text-xs font-medium
-                      px-2.5 py-1.5 rounded-md whitespace-nowrap
-                      pointer-events-none select-none z-50
-                      opacity-0 group-hover/nav:opacity-100
-                      transition-opacity duration-150
-                    ">
-                      {item.label}
+                      {/* Expand / collapse triangle */}
+                      {hasChildren && (
+                        <button
+                          onClick={() => toggleExpand(item.path)}
+                          aria-label={isOpen ? 'Collapse' : 'Expand'}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded text-white/45 hover:text-white/90 hover:bg-white/10 transition-colors"
+                        >
+                          <svg className={`w-3.5 h-3.5 transition-transform duration-150 ${isOpen ? 'rotate-90' : ''}`} viewBox="0 0 12 12" fill="currentColor">
+                            <path d="M4 2l4 4-4 4z" />
+                          </svg>
+                        </button>
+                      )}
+
+                      {collapsed && (
+                        <div className="
+                          absolute left-full top-1/2 -translate-y-1/2 ml-1.5
+                          bg-neutral-600/75 text-white/90 text-xs font-medium
+                          px-2.5 py-1.5 rounded-md whitespace-nowrap
+                          pointer-events-none select-none z-50
+                          opacity-0 group-hover/nav:opacity-100
+                          transition-opacity duration-150
+                        ">
+                          {item.label}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    {/* Tree connector line: equal gap below Sophia's icon and above the next item */}
+                    {hasChildren && isOpen && (
+                      <div aria-hidden className="absolute left-[18px] top-[34px] bottom-[2px] w-px bg-white/15" />
+                    )}
+
+                    {/* Sub-pages */}
+                    {hasChildren && isOpen && (
+                      <div className="mt-px mb-1 flex flex-col gap-px pl-5 pr-1">
+                        {item.children!.map((child) => (
+                          <NavLink
+                            key={child.path}
+                            to={child.path}
+                            className={({ isActive }) =>
+                              `flex items-center rounded-md px-2.5 py-1.75 text-[13px] truncate transition-colors ${
+                                isActive
+                                  ? 'bg-white/10 text-white'
+                                  : 'text-white/55 hover:text-white/90 hover:bg-white/6'
+                              }`
+                            }
+                          >
+                            <span className="truncate">{child.label}</span>
+                          </NavLink>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))}

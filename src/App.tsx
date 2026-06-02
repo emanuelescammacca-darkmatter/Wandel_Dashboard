@@ -4,6 +4,14 @@ import AiCandidates from './pages/AiCandidates';
 import CandidateDetail from './pages/CandidateDetail';
 import Performance from './pages/Performance';
 import Pipeline from './pages/Pipeline';
+import Positions from './pages/Positions';
+import PositionDetail from './pages/PositionDetail';
+import ClientPositions from './pages/ClientPositions';
+import PositionWorkspace from './pages/PositionWorkspace';
+import PositionCandidateDetail from './pages/PositionCandidateDetail';
+import NewPosition from './pages/NewPosition';
+import AskSophia from './pages/AskSophia';
+import Dashboard from './pages/Dashboard';
 import SophiaCalls from './pages/SophiaCalls';
 import HRCalls from './pages/HRCalls';
 
@@ -28,13 +36,22 @@ export default function App() {
         <main className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden">
           <Routes>
             <Route path="/" element={<Navigate to="/ai-candidates" replace />} />
+            <Route path="/ask-sophia" element={<AskSophia />} />
+            <Route path="/ask-sophia/senior-nurse-berlin" element={<Placeholder title="Senior Nurse – Berlin" />} />
+            <Route path="/ask-sophia/warehouse-lead-hamburg" element={<Placeholder title="Warehouse Lead – Hamburg" />} />
+            <Route path="/ask-sophia/sales-rep-munich" element={<Placeholder title="Sales Rep – Munich" />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/ai-candidates" element={<AiCandidates />} />
             <Route path="/ai-candidates/:id" element={<CandidateDetail />} />
             <Route path="/candidates" element={<AiCandidates />} />
             <Route path="/candidates/:id" element={<CandidateDetail />} />
-            <Route path="/positions" element={<Placeholder title="Positions" />} />
+            <Route path="/positions" element={<Positions />} />
+            <Route path="/positions/:id" element={<PositionDetail />} />
             <Route path="/employers" element={<Placeholder title="Employers" />} />
-            <Route path="/candidate-leads" element={<Placeholder title="Candidate Leads" />} />
+            <Route path="/clients/new-position" element={<NewPosition />} />
+            <Route path="/clients/positions" element={<PositionWorkspace />} />
+            <Route path="/clients/positions/candidate/:id" element={<PositionCandidateDetail />} />
+            <Route path="/clients/positions-2" element={<ClientPositions />} />
             <Route path="/sophia-calls" element={<SophiaCalls />} />
             <Route path="/hr-calls" element={<HRCalls />} />
             <Route path="/whatsapp" element={<Placeholder title="WhatsApp" />} />
@@ -44,9 +61,6 @@ export default function App() {
             <Route path="/analytics/pipeline" element={<Pipeline />} />
             <Route path="/ai-call" element={<Placeholder title="AI Call" />} />
             <Route path="/bulk-messaging" element={<Placeholder title="Bulk Messaging" />} />
-            <Route path="/position-configuration" element={<Placeholder title="Position Configuration" />} />
-            <Route path="/course-proficiency" element={<Placeholder title="Course Proficiency" />} />
-            <Route path="/language-configuration" element={<Placeholder title="Language Configuration" />} />
             <Route path="/users" element={<Placeholder title="User Management" />} />
             <Route path="/logs" element={<Placeholder title="Logs" />} />
             <Route path="*" element={<Navigate to="/ai-candidates" replace />} />
