@@ -347,9 +347,9 @@ export function seedInitialEvaluations(
   const result: Record<string, CellEval> = {};
   candidates.forEach((c, ci) => {
     const base =
-      c.analysisOutcome === 'qualified'   ? 8 :
-      c.analysisOutcome === 'inconclusive' ? 5 :
-      c.analysisOutcome === 'not-qualified' ? 4 :
+      c.analysisOutcome === 'interview_completed_full'    ? 8 :
+      c.analysisOutcome === 'interview_completed_partial' ? 5 :
+      c.analysisOutcome === 'reschedule_requested'        ? 4 :
       null;
     if (base === null) return;
     criteria.forEach((block, bi) => {

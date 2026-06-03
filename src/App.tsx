@@ -2,8 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import AiCandidates from './pages/AiCandidates';
 import CandidateDetail from './pages/CandidateDetail';
-import Performance from './pages/Performance';
-import Pipeline from './pages/Pipeline';
 import Positions from './pages/Positions';
 import PositionDetail from './pages/PositionDetail';
 import ClientPositions from './pages/ClientPositions';
@@ -12,8 +10,6 @@ import PositionCandidateDetail from './pages/PositionCandidateDetail';
 import NewPosition from './pages/NewPosition';
 import AskSophia from './pages/AskSophia';
 import Dashboard from './pages/Dashboard';
-import SophiaCalls from './pages/SophiaCalls';
-import HRCalls from './pages/HRCalls';
 
 function Placeholder({ title }: { title: string }) {
   return (
@@ -52,13 +48,13 @@ export default function App() {
             <Route path="/clients/positions" element={<PositionWorkspace />} />
             <Route path="/clients/positions/candidate/:id" element={<PositionCandidateDetail />} />
             <Route path="/clients/positions-2" element={<ClientPositions />} />
-            <Route path="/sophia-calls" element={<SophiaCalls />} />
-            <Route path="/hr-calls" element={<HRCalls />} />
+            <Route path="/sophia-calls" element={<Placeholder title="Sophia Calls" />} />
+            <Route path="/hr-calls" element={<Placeholder title="HR Calls" />} />
             <Route path="/whatsapp" element={<Placeholder title="WhatsApp" />} />
             <Route path="/instagram" element={<Placeholder title="Instagram" />} />
             <Route path="/facebook" element={<Placeholder title="Facebook" />} />
-            <Route path="/analytics/performance" element={<Performance />} />
-            <Route path="/analytics/pipeline" element={<Pipeline />} />
+            <Route path="/analytics/performance" element={<Placeholder title="Performance" />} />
+            <Route path="/analytics/pipeline" element={<Placeholder title="Pipeline Report" />} />
             <Route path="/ai-call" element={<Placeholder title="AI Call" />} />
             <Route path="/bulk-messaging" element={<Placeholder title="Bulk Messaging" />} />
             <Route path="/users" element={<Placeholder title="User Management" />} />

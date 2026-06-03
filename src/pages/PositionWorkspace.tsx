@@ -90,15 +90,26 @@ const COLS = 'grid-cols-[2fr_1.3fr_1.4fr_1.2fr_0.8fr_1fr_1.4fr]';
 const HEADERS = ['Candidate', 'Job Title', 'Status', 'Analysis Outcome', 'German', 'Earliest Start', 'Call Flags'];
 
 const OUTCOME_LABELS: Record<AnalysisOutcome, string> = {
-  qualified: 'Qualified', 'not-qualified': 'Not Qualified', voicemail: 'Voicemail',
-  inconclusive: 'Inconclusive', 'no-contact': 'No Contact',
+  interview_completed_full: 'Interview Complete',
+  interview_completed_partial: 'Interview (Partial)',
+  reschedule_requested: 'Reschedule',
+  voicemail_detected: 'Voicemail',
+  no_meaningful_interaction: 'No Interaction',
+  wrong_person: 'Wrong Person',
+  consent_declined: 'Consent Declined',
+  technical_failure: 'Technical Failure',
+  other: 'Other',
 };
 const OUTCOME_STYLES: Record<AnalysisOutcome, string> = {
-  qualified: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-  'not-qualified': 'text-red-600 bg-red-50 border-red-200',
-  voicemail: 'text-amber-700 bg-amber-50 border-amber-200',
-  inconclusive: 'text-gray-500 bg-gray-50 border-gray-200',
-  'no-contact': 'text-gray-500 bg-gray-50 border-gray-200',
+  interview_completed_full: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+  interview_completed_partial: 'text-sky-700 bg-sky-50 border-sky-200',
+  reschedule_requested: 'text-amber-700 bg-amber-50 border-amber-200',
+  voicemail_detected: 'text-amber-700 bg-amber-50 border-amber-200',
+  no_meaningful_interaction: 'text-gray-500 bg-gray-50 border-gray-200',
+  wrong_person: 'text-gray-500 bg-gray-50 border-gray-200',
+  consent_declined: 'text-red-600 bg-red-50 border-red-200',
+  technical_failure: 'text-red-600 bg-red-50 border-red-200',
+  other: 'text-gray-500 bg-gray-50 border-gray-200',
 };
 
 function OutcomeBadge({ value }: { value: AnalysisOutcome | null }) {
