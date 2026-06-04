@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { NavLink } from 'react-router-dom';
 import wandelLogo from '../assets/wandel-logo.png';
 
@@ -97,25 +97,61 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Positions - Clients',
     items: [
-      { label: 'Position X',   path: '/clients/positions',    icon: Icons.one },
-      { label: 'Position 2',   path: '/clients/positions-2',  icon: Icons.two },
-      { label: 'New Position', path: '/clients/new-position', icon: Icons.plus },
+      { label: 'Servicetechniker für Kaffeeautomaten', path: '/clients/positions',    icon: Icons.one },
+      { label: 'Lagerlogistiker',                      path: '/clients/positions-2',  icon: Icons.two },
     ],
   },
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+const MIN_W = 184; // smallest the expanded sidebar may be dragged
+const maxWidth = () => Math.round(window.innerWidth / 3); // at most one third of the page
+
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [width, setWidth] = useState(208); // expanded width (px), drag-resizable
+  const [resizing, setResizing] = useState(false);
   const toggleExpand = (path: string) =>
     setExpanded((prev) => ({ ...prev, [path]: !prev[path] }));
 
+  // Drag the right edge to resize, clamped to [MIN_W, one third of the page].
+  const startResize = (e: ReactMouseEvent) => {
+    e.preventDefault();
+    setResizing(true);
+    const onMove = (ev: MouseEvent) =>
+      setWidth(Math.min(Math.max(ev.clientX, MIN_W), maxWidth()));
+    const onUp = () => {
+      setResizing(false);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  // Keyboard fallback: arrow keys nudge the width within the same clamp.
+  const onHandleKey = (e: ReactKeyboardEvent) => {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); setWidth((w) => Math.max(w - 16, MIN_W)); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); setWidth((w) => Math.min(w + 16, maxWidth())); }
+  };
+
+  // If the window shrinks, keep the sidebar within one third of the page.
+  useEffect(() => {
+    const onResize = () => setWidth((w) => Math.min(w, maxWidth()));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   return (
     <aside
-      style={{ fontFamily: "'Inter', sans-serif" }}
-      className={`${collapsed ? 'w-13' : 'w-52'} h-screen bg-[#1e3a5f] flex flex-col shrink-0 transition-all duration-200 ease-in-out`}
+      style={{ fontFamily: "'Inter', sans-serif", width: collapsed ? 52 : width }}
+      className={`relative h-screen bg-[#1e3a5f] flex flex-col shrink-0 ${resizing ? '' : 'transition-all duration-200 ease-in-out'}`}
     >
       {/* ── Header: logo + collapse toggle (always same row) ── */}
       <div className={`flex items-center pt-4 pb-2 ${collapsed ? 'justify-center px-0' : 'justify-between px-3'}`}>
@@ -279,6 +315,27 @@ export default function Sidebar() {
           )}
         </div>
       </div>
+
+      {/* ── Drag handle: resize the expanded sidebar (clamped MIN_W .. one third of page).
+          Sits in the gutter just past the sidebar's right edge (z-20 over the main area) so
+          it never overlaps the nav scrollbar; keyboard-operable via arrow keys. ── */}
+      {!collapsed && (
+        <div
+          onMouseDown={startResize}
+          onKeyDown={onHandleKey}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+          aria-valuenow={width}
+          aria-valuemin={MIN_W}
+          aria-valuemax={maxWidth()}
+          tabIndex={0}
+          title="Drag to resize"
+          className="group/resize absolute inset-y-0 -right-2 w-2 z-20 cursor-col-resize focus:outline-none"
+        >
+          <span className={`absolute inset-y-0 left-0 w-px transition-colors ${resizing ? 'bg-white/40' : 'bg-white/10 group-hover/resize:bg-white/30 group-focus-visible/resize:bg-white/50'}`} />
+        </div>
+      )}
     </aside>
   );
 }

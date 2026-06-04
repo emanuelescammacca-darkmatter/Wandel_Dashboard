@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import { CARD_GRADIENT } from '../theme';
+import wandelLogo from '../assets/wandel-logo.png';
 
 /* ──────────────────────────────────────────────────────────────────────────
    Client-facing recruiting dashboard — Design v4.
@@ -82,17 +84,6 @@ const CANDIDATES_MORE: Cand[] = [
   { name: 'Jürgen Stein', position: 'Servicetechniker für Kaffeeautomaten', summary: 'Experienced field technician · Available July 2026', stage: 'Qualified', fit: '65% fit', rank: '#4 of 21', available: 'Jul 2026', experience: '9 yrs', color: '#b45309' },
 ];
 
-/* Aggregate outreach (across all positions). bars = last 5 days (Mon–Fri). */
-const OUTREACH: { key?: ChannelKey; label: string; barColor: string; bars: number[]; contacted: number; responses: number; custom?: boolean; hr?: boolean }[] = [
-  { key: 'sophia', label: 'Sophia AI', barColor: '#4f46e5', bars: [16, 20, 14, 22, 18], contacted: 42, responses: 16 },
-  { key: 'whatsapp', label: 'WhatsApp', barColor: '#25d366', bars: [12, 18, 22, 16, 20], contacted: 30, responses: 22 },
-  { key: 'instagram', label: 'Instagram', barColor: '#d6249f', bars: [20, 14, 18, 12, 16], contacted: 50, responses: 12 },
-  { key: 'facebook', label: 'Facebook', barColor: '#1877f2', bars: [8, 10, 6, 12, 8], contacted: 18, responses: 6 },
-  { label: 'HR Team', barColor: '#0f766e', bars: [10, 14, 8, 12, 10], contacted: 28, responses: 19, hr: true },
-  { key: 'metaads', label: 'Meta Ads', barColor: '#0081fb', bars: [18, 22, 20, 24, 22], contacted: 65, responses: 15 },
-  { key: 'sophia', label: 'Sophia AI ✦', barColor: '#4f46e5', bars: [16, 20, 14, 22, 18], contacted: 42, responses: 16, custom: true },
-];
-
 const STAGE_PILL: Record<string, string> = {
   'Interview Ready': 'text-[#16a34a] bg-[#f0fdf4] border-[#bbf7d0]',
   Qualified: 'text-[#4f46e5] bg-[#eef2ff] border-[#c7d2fe]',
@@ -103,11 +94,6 @@ const FIT_BADGE: Record<string, string> = {
 };
 
 const initials = (n: string) => n.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-
-/* Soft pastel linear gradient (Figma colors #FFEB52 / #52F9FF / #5252FF / #FF00B8) at low
-   opacity over white — cyan/green pushed to the top-left corner, pink centred. */
-const CARD_GRADIENT =
-  'linear-gradient(135deg, rgba(82,249,255,0.035) 0%, rgba(82,82,255,0.028) 26%, rgba(255,0,184,0.04) 52%, rgba(255,235,82,0.025) 100%), #ffffff';
 
 const SCROLL_ROW = 'flex gap-5 overflow-x-auto pb-3 [&::-webkit-scrollbar]:hidden';
 
@@ -219,20 +205,48 @@ function SophiaImageLogo() {
   );
 }
 
-/* HR Team — human recruiters making direct phone calls (teal, distinct from channels). */
+/* Sophia as the central funnel hub: the full Sophia AI node block (avatar + label,
+   same as the bottom handler), but with the Wandel node's indigo→violet→cyan
+   gradient border + glow in place of the plain hairline border. */
+function SophiaHub() {
+  return (
+    <div className="p-[2px] rounded-xl bg-gradient-to-br from-indigo-400 via-violet-400 to-cyan-300 shrink-0 shadow-[0_0_22px_rgba(129,140,248,0.4)]">
+      <div
+        style={{ width: 112, height: 100 }}
+        className="rounded-[10px] bg-[#111a3c] flex flex-col items-center justify-center gap-1.5 text-center px-1.5"
+      >
+        <SophiaImageLogo />
+        <p className="text-[11px] font-semibold text-white leading-tight">Sophia AI</p>
+      </div>
+    </div>
+  );
+}
+
+/* HR Team — teal badge carrying the Wandel mark (distinct from the channels). */
 function HRLogo() {
   return (
     <div className="w-13 h-13 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: '#0f766e', overflow: 'hidden' }}>
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.21h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.85a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
-      </svg>
+      <span
+        role="img"
+        aria-label="Wandel"
+        className="inline-block shrink-0"
+        style={{
+          width: 30,
+          height: 30,
+          backgroundImage: `url(${wandelLogo})`,
+          backgroundRepeat: 'no-repeat',
+          backgroundSize: '43.35px 43.35px',
+          backgroundPosition: '-6.9px -3.6px',
+          filter: 'brightness(0) invert(1)',
+        }}
+      />
     </div>
   );
 }
 
 /* ── Candidate card (reused by both rows). noAvatar drops the avatar and
    lifts the name onto the badge row (used for cards 3 & 4). ── */
-function CandidateCard({ c, noAvatar }: { c: Cand; noAvatar?: boolean }) {
+function CandidateCard({ c, noAvatar, plain }: { c: Cand; noAvatar?: boolean; plain?: boolean }) {
   const badges = (
     <div className="flex gap-1.5 items-center shrink-0">
       <span className={`text-[11px] font-semibold rounded-full px-2 py-0.5 border ${FIT_BADGE[c.stage]}`}>{c.fit}</span>
@@ -240,7 +254,7 @@ function CandidateCard({ c, noAvatar }: { c: Cand; noAvatar?: boolean }) {
     </div>
   );
   return (
-    <div className="rounded-[10px] border border-[#e2e8f0] flex flex-col shrink-0" style={{ minWidth: 280, minHeight: 240, padding: '16px 16px 12px', scrollSnapAlign: 'start', background: CARD_GRADIENT }}>
+    <div className="rounded-[10px] border border-[#e2e8f0] flex flex-col shrink-0" style={{ minWidth: 280, minHeight: 240, padding: '16px 16px 12px', scrollSnapAlign: 'start', background: plain ? '#ffffff' : CARD_GRADIENT }}>
       {noAvatar ? (
         <div className="flex justify-between items-start gap-2">
           <div className="min-w-0">
@@ -474,6 +488,304 @@ const REACH_TOTAL = REACH_SEGMENTS.reduce((a, s) => a + s.value, 0);
 const FUNNEL_LABELS = ['Identified', 'Responded', 'Qualified', 'Interview Ready'];
 const FUNNEL_COLORS = ['#64748b', '#818cf8', '#6366f1', '#34d399'];
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Outreach Funnel — a flow-chart view of the same channels. Two ad-platform
+   clusters feed the funnel: WhatsApp / Instagram / Facebook → Meta Ads, and
+   Google Search / YouTube → Google Ads. Meta Ads, Google Ads and the job boards
+   (LinkedIn, Indeed, Xing, Stepstone) all converge into the Sophia hub, which
+   routes on to the HR Team. From HR, candidate cards stream down and are absorbed
+   into the open-position nodes at the bottom. Fixed 1160×770 coordinate canvas: an
+   SVG connector layer (smooth curves) behind absolutely-positioned nodes, with the
+   candidate cards as an HTML/CSS layer below. The existing "Outreach Channels"
+   section is left unchanged.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Smooth vertical S-curve from (sx,sy) down to (ex,ey) — leaves and arrives vertically. */
+const vCurve = (sx: number, sy: number, ex: number, ey: number) => {
+  const k = Math.min(120, Math.max(30, Math.abs(ey - sy) * 0.5));
+  return `M${sx} ${sy} C ${sx} ${sy + k} ${ex} ${ey - k} ${ex} ${ey}`;
+};
+/* One animation cycle (s): border-glow loop, signal travel, and hub pulse all share it. */
+const FUNNEL_T = 3.4;
+
+/* Generic circular brand badge: white Simple-Icons glyph on the brand colour.
+   Falls back to an initials monogram when no slug is given (brand not in the icon
+   set) or if the icon CDN is unreachable. Mirrors MetaLogo's CDN + fallback pattern. */
+function BrandBadge({ slug, color, initials, size = 52 }: { slug?: string; color: string; initials: string; size?: number }) {
+  const [err, setErr] = useState(false);
+  const icon = Math.round(size * 0.52);
+  return (
+    <div className="rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ width: size, height: size, background: color }}>
+      {!slug || err ? (
+        <span className="text-white font-bold" style={{ fontSize: Math.round(size * 0.32) }}>{initials}</span>
+      ) : (
+        <img
+          src={`https://cdn.jsdelivr.net/npm/simple-icons@v13/icons/${slug}.svg`}
+          width={icon} height={icon} alt={slug}
+          style={{ filter: 'brightness(0) invert(1)' }}
+          onError={() => setErr(true)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* Stepstone — not in the icon set, so a custom badge with its three-stone mark. */
+function StepstoneLogo({ size = 52 }: { size?: number }) {
+  const glyph = Math.round(size * 0.62);
+  return (
+    <div className="rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ width: size, height: size, background: '#0E5FD8' }}>
+      <svg width={glyph} height={glyph} viewBox="0 0 24 24" fill="#fff" aria-label="Stepstone">
+        <ellipse cx="12" cy="7.5" rx="4.4" ry="3.2" />
+        <ellipse cx="7.3" cy="15.8" rx="4.2" ry="3.1" />
+        <ellipse cx="16.7" cy="15.8" rx="4.2" ry="3.1" />
+      </svg>
+    </div>
+  );
+}
+
+/* Funnel node: brand logo + name, sized per row. Opaque fill so the connector
+   lines pass *behind* it. By default `funnel-node` adds the rotating "loading"
+   glow border. When `pulse` is given the node instead carries `funnel-node-pulse`
+   — a subtle glow that flares only as its outgoing signal leaves, synced to that
+   signal's clock via the --glow-dur / --glow-delay CSS variables. */
+function FunnelNode({ logo, name, w, h, pulse }: { logo: React.ReactNode; name: string; w: number; h: number; pulse?: { dur: number; begin: number } }) {
+  const style = { width: w, height: h } as React.CSSProperties & Record<string, string | number>;
+  if (pulse) {
+    style['--glow-dur'] = `${pulse.dur}s`;
+    style['--glow-delay'] = `${pulse.begin}s`;
+  }
+  return (
+    <div
+      style={style}
+      className={`${pulse ? 'funnel-node-pulse' : 'funnel-node'} rounded-xl border border-white/[0.09] bg-[#111a3c] flex flex-col items-center justify-center gap-1.5 text-center px-1.5`}
+    >
+      {logo}
+      <p className="text-[11px] font-semibold text-white leading-tight">{name}</p>
+    </div>
+  );
+}
+
+/* Absolute placement helper: position a node by horizontal center + top (canvas px). */
+function FunnelSlot({ cx, top, children }: { cx: number; top: number; children: React.ReactNode }) {
+  return <div className="absolute" style={{ left: cx, top, transform: 'translateX(-50%)' }}>{children}</div>;
+}
+
+/* Top-row source channels (cx = horizontal centre on the 1160-wide canvas).
+   Left → right: the Meta cluster, the job boards, then the Google cluster.
+   `edge` is the index into FUNNEL_EDGES/SIGNAL_TIMING of this node's outgoing
+   signal, so the node's glow can pulse in sync with the signal it emits. */
+const FUNNEL_SOURCES: { cx: number; name: string; edge: number; logo: React.ReactNode }[] = [
+  { cx: 72, name: 'WhatsApp', edge: 0, logo: <OutreachLogo k="whatsapp" size={40} /> },
+  { cx: 199, name: 'Instagram', edge: 1, logo: <OutreachLogo k="instagram" size={40} /> },
+  { cx: 326, name: 'Facebook', edge: 2, logo: <OutreachLogo k="facebook" size={40} /> },
+  { cx: 453, name: 'LinkedIn', edge: 7, logo: <BrandBadge slug="linkedin" color="#0A66C2" initials="in" size={40} /> },
+  { cx: 580, name: 'Indeed', edge: 8, logo: <BrandBadge slug="indeed" color="#003A9B" initials="Id" size={40} /> },
+  { cx: 707, name: 'Xing', edge: 9, logo: <BrandBadge slug="xing" color="#006567" initials="Xi" size={40} /> },
+  { cx: 834, name: 'Stepstone', edge: 10, logo: <StepstoneLogo size={40} /> },
+  { cx: 961, name: 'Google Search', edge: 3, logo: <BrandBadge slug="google" color="#4285F4" initials="G" size={40} /> },
+  { cx: 1088, name: 'YouTube', edge: 4, logo: <BrandBadge slug="youtube" color="#FF0000" initials="YT" size={40} /> },
+];
+
+/* Node centres on the 1160×560 canvas. Connectors run centre→centre and tuck
+   under the opaque nodes; signals travel these same paths into the Wandel hub. */
+const FN = {
+  // wandelTop centres the ~104px-tall hub block on wandelCy (294 − 104/2 ≈ 242),
+  // so the connectors converge on the block's middle.
+  wandelCx: 580, wandelCy: 294, wandelTop: 242,
+} as const;
+
+/* Directed edges (centre→centre). `out` edges leave the hub for the handlers. */
+const FUNNEL_EDGES: { fx: number; fy: number; tx: number; ty: number; out?: boolean }[] = [
+  // Meta cluster → Meta Ads
+  { fx: 72, fy: 48, tx: 290, ty: 174 },
+  { fx: 199, fy: 48, tx: 290, ty: 174 },
+  { fx: 326, fy: 48, tx: 290, ty: 174 },
+  // Google cluster → Google Ads
+  { fx: 961, fy: 48, tx: 870, ty: 174 },
+  { fx: 1088, fy: 48, tx: 870, ty: 174 },
+  // Ad platforms → Wandel
+  { fx: 290, fy: 174, tx: 580, ty: 294 },
+  { fx: 870, fy: 174, tx: 580, ty: 294 },
+  // Job boards → Wandel (direct)
+  { fx: 453, fy: 48, tx: 580, ty: 294 },
+  { fx: 580, fy: 48, tx: 580, ty: 294 },
+  { fx: 707, fy: 48, tx: 580, ty: 294 },
+  { fx: 834, fy: 48, tx: 580, ty: 294 },
+  // Hub → HR Team (centred straight below the hub)
+  { fx: 580, fy: 294, tx: 580, ty: 428, out: true },
+];
+
+/* Per-signal timing (one entry per edge, same order as FUNNEL_EDGES).
+   [dur, begin] — dur sets each signal's travel time (its frequency) and the
+   negative begin phase-shifts it so dots leave their channels out of sync,
+   each at its own cadence, rather than all firing on a single shared cycle. */
+const SIGNAL_TIMING: [number, number][] = [
+  [2.6, -0.4], [3.4, -1.8], [2.2, -0.9],                 // Meta cluster → Meta Ads
+  [3.0, -2.1], [2.8, -0.6],                              // Google cluster → Google Ads
+  [2.4, -1.2], [2.7, -0.3],                              // ad platforms → Wandel
+  [3.6, -2.5], [2.1, -1.0], [3.2, -0.5], [2.9, -1.6],    // job boards → Wandel
+  [2.5, -1.4],                                           // Hub → HR Team
+];
+/* Signal colour — luminous cyan, distinct from the indigo hub/border glow. */
+const SIGNAL_COLOR = '#22d3ee';
+
+/* Pulse timing for a node, taken from one of its signal edges — the node's glow
+   flares at the cycle boundary, i.e. as that signal departs (emitters) or arrives
+   (the terminal HR node), since a signal's arrival (t=1) is the next cycle's t=0. */
+const sigPulse = (edge: number) => ({ dur: SIGNAL_TIMING[edge][0], begin: SIGNAL_TIMING[edge][1] });
+
+/* ── Bottom of the funnel: open-position nodes + the candidate cards that stream
+   out of HR Team and get absorbed into them. ── */
+const FUNNEL_POSITION_CX = [230, 580, 930];
+const FUNNEL_POSITIONS = POSITIONS.map((p, i) => ({ title: p.title, cx: FUNNEL_POSITION_CX[i] ?? 580 }));
+const HR_EMIT = { x: 580, y: 481 };   // card spawn centre, just below the HR node
+const POS_CY = 570;                    // vertical centre of the position nodes
+const POS_TOP = 544;                   // top edge of the position nodes (POS_CY − ~26)
+/* Candidate streams: target = index into FUNNEL_POSITIONS; dur/delay desync them
+   (negative delay = already mid-flight at load, same trick as the signals' begin). */
+const CANDIDATE_FLOWS: { target: number; dur: number; delay: number }[] = [
+  { target: 0, dur: 4.5, delay: -0.6 },
+  { target: 1, dur: 4.5, delay: -2.1 },
+  { target: 2, dur: 4.5, delay: -3.6 },
+];
+
+/* Generic placeholder candidate profile — anonymous avatar glyph + skeleton bars. */
+function MiniProfileCard() {
+  return (
+    <div className="flex items-center gap-1.5 rounded-md border border-white/10 bg-[#0f1733] shadow-[0_2px_8px_rgba(0,0,0,0.35)]" style={{ width: 78, padding: '4px 6px' }}>
+      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-slate-500 to-slate-600 flex items-center justify-center shrink-0">
+        <svg viewBox="0 0 24 24" width="11" height="11" fill="#e2e8f0"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z" /></svg>
+      </div>
+      <div className="flex-1 flex flex-col gap-1">
+        <span className="block h-1.5 rounded-full bg-white/35" style={{ width: '85%' }} />
+        <span className="block h-1.5 rounded-full bg-white/15" style={{ width: '55%' }} />
+      </div>
+    </div>
+  );
+}
+
+function OutreachFunnel() {
+  const T = `${FUNNEL_T}s`;
+  return (
+    <div className="relative mx-auto mt-0" style={{ width: 1160, height: 604, '--funnel-T': T } as React.CSSProperties}>
+      {/* Connector + signal layer (behind the opaque nodes) */}
+      <svg
+        width="1160" height="560" viewBox="0 0 1160 560"
+        className="absolute inset-0 pointer-events-none"
+        fill="none" stroke="rgba(148,163,184,0.45)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"
+      >
+        {/* soft glow so the travelling dots read as signals */}
+        <defs>
+          <filter id="signalGlow" x="-300%" y="-300%" width="700%" height="700%">
+            <feGaussianBlur stdDeviation="2.2" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* connector lines (ids reused by the signal dots) */}
+        {FUNNEL_EDGES.map((e, i) => (
+          <path key={`l${i}`} id={`fe${i}`} d={vCurve(e.fx, e.fy, e.tx, e.ty)} />
+        ))}
+
+        {/* Signals — a glowing cyan "droplet" rides each edge on its own clock.
+            The outer <g> travels the path with rotate="auto", so its local x-axis
+            tracks the line; the inner shape is a long, shallow lens centred on the
+            line, and its vertical scale swells out (both sides) then sinks back in,
+            reading as a fluid bulge passing along the wire. Each runs on its own
+            `dur` (frequency), phase-shifted by a negative `begin`, so signals fire
+            out of sync rather than together. */}
+        {FUNNEL_EDGES.map((_, i) => {
+          const [dur, begin] = SIGNAL_TIMING[i];
+          return (
+            <g key={`s${i}`} opacity={0}>
+              <animateMotion
+                dur={`${dur}s`} begin={`${begin}s`} rotate="auto" repeatCount="indefinite" calcMode="linear"
+                keyPoints="0;1" keyTimes="0;1"
+              >
+                <mpath href={`#fe${i}`} />
+              </animateMotion>
+              <animate
+                attributeName="opacity" dur={`${dur}s`} begin={`${begin}s`} repeatCount="indefinite" calcMode="linear"
+                values="0;1;1;0" keyTimes="0;0.12;0.82;1"
+              />
+              <path d="M -12 0 C -1 -4.5 1 -4.5 12 0 C 1 4.5 -1 4.5 -12 0 Z" fill={SIGNAL_COLOR} stroke="none" filter="url(#signalGlow)" transform="scale(1 0.15)">
+                <animateTransform
+                  attributeName="transform" type="scale"
+                  dur={`${dur}s`} begin={`${begin}s`} repeatCount="indefinite"
+                  calcMode="spline" values="1 0.15;1 1;1 0.15" keyTimes="0;0.5;1"
+                  keySplines="0.4 0 0.2 1;0.4 0 0.2 1"
+                />
+              </path>
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Top row — source channels (subtle glow pulses as each one emits its signal) */}
+      {FUNNEL_SOURCES.map(s => {
+        const [dur, begin] = SIGNAL_TIMING[s.edge];
+        return (
+          <FunnelSlot key={s.name} cx={s.cx} top={8}>
+            <FunnelNode logo={s.logo} name={s.name} w={112} h={80} pulse={{ dur, begin }} />
+          </FunnelSlot>
+        );
+      })}
+
+      {/* Ad platforms — pulled toward the centre and closer to the hub (glow pulses as each forwards its signal) */}
+      <FunnelSlot cx={290} top={134}><FunnelNode logo={<OutreachLogo k="metaads" size={44} />} name="Meta Ads" w={120} h={80} pulse={sigPulse(5)} /></FunnelSlot>
+      <FunnelSlot cx={870} top={134}><FunnelNode logo={<BrandBadge slug="googleads" color="#4285F4" initials="GA" size={44} />} name="Google Ads" w={120} h={80} pulse={sigPulse(6)} /></FunnelSlot>
+
+      {/* Grouping box around the Wandel unit (Sophia hub + HR Team) */}
+      <div className="absolute rounded-2xl border border-white/15 bg-white/[0.025] pointer-events-none" style={{ left: 480, top: 224, width: 200, height: 256 }} />
+
+      {/* Central hub (Sophia) */}
+      <FunnelSlot cx={FN.wandelCx} top={FN.wandelTop}>
+        <SophiaHub />
+      </FunnelSlot>
+
+      {/* Outreach handler — centred just below the hub (glow pulses as the signal reaches it) */}
+      <FunnelSlot cx={580} top={384}><FunnelNode logo={<HRLogo />} name="HR Team" w={140} h={88} pulse={sigPulse(11)} /></FunnelSlot>
+
+      {/* Candidate cards — stream out of HR Team and fan down toward the positions.
+          Outer div anchors the spawn centre (just below HR); the inner .candidate-flow
+          carries the CSS animation, translating to its target position node (--tx/--ty)
+          then shrinking + fading as it's "absorbed". Rendered before the position nodes
+          so an arriving card disappears under their opaque fill. */}
+      {CANDIDATE_FLOWS.map((f, i) => {
+        const pos = FUNNEL_POSITIONS[f.target];
+        const tx = pos.cx - HR_EMIT.x;
+        const ty = POS_CY - HR_EMIT.y;
+        return (
+          <div key={`cf${i}`} className="absolute pointer-events-none" style={{ left: HR_EMIT.x, top: HR_EMIT.y, transform: 'translate(-50%,-50%)' }}>
+            <div
+              className="candidate-flow"
+              style={{ '--tx': `${tx}px`, '--ty': `${ty}px`, '--flow-dur': `${f.dur}s`, '--flow-delay': `${f.delay}s` } as React.CSSProperties}
+            >
+              <MiniProfileCard />
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Open-position nodes — text nodes at the very bottom; candidates land here */}
+      {FUNNEL_POSITIONS.map((p, i) => (
+        <FunnelSlot key={`pos${i}`} cx={p.cx} top={POS_TOP}>
+          <div
+            className="rounded-lg border border-white/10 bg-[#111a3c] shadow-[0_2px_10px_rgba(0,0,0,0.4)] flex items-center justify-center text-center"
+            style={{ width: 220, minHeight: 52, padding: '8px 12px' }}
+          >
+            <p className="text-[11px] font-semibold text-white leading-snug">{p.title}</p>
+          </div>
+        </FunnelSlot>
+      ))}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [showMore, setShowMore] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -565,7 +877,7 @@ export default function Dashboard() {
                     {selectedCandidates.length > 0 ? (
                       selectedCandidates.map((c, i) => (
                         <div key={c.name} className="shrink-0 animate-panel-in" style={{ animationDelay: `${i * 60}ms`, scrollSnapAlign: 'start' }}>
-                          <CandidateCard c={c} />
+                          <CandidateCard c={c} plain />
                         </div>
                       ))
                     ) : (
@@ -672,35 +984,11 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {/* C. Outreach Channels — brand logos + sparklines */}
+          {/* D. Outreach Funnel — flow-chart view of the same channels (Meta/Google → Wandel → Sophia/HR) */}
           <section className="mt-12">
-            <SectionLabel>Outreach Channels</SectionLabel>
-            <div className="flex justify-between gap-4 pt-1">
-              {OUTREACH.map((o, idx) => (
-                <div key={idx} className="flex-1 flex justify-center">
-                  <div className="relative group flex flex-col items-center text-center rounded-xl border border-white/[0.07] py-4 px-3 w-32">
-                  {o.custom ? <SophiaImageLogo /> : o.hr ? <HRLogo /> : <OutreachLogo k={o.key!} />}
-                  <p className="text-[12px] font-semibold text-white mt-2">{o.label}</p>
-
-                  {/* sparkline */}
-                  <div className="flex items-end gap-1 mt-2" style={{ height: 28 }}>
-                    {o.bars.map((h, i) => (
-                      <div key={i} className="flex flex-col items-center">
-                        <span style={{ width: 6, height: h, background: o.barColor, borderTopLeftRadius: 3, borderTopRightRadius: 3 }} />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex gap-1 mt-0.5">
-                    {['M', 'T', 'W', 'T', 'F'].map((d, i) => (
-                      <span key={i} className="text-[8px] text-[#94a3b8] text-center" style={{ width: 6 }}>{d}</span>
-                    ))}
-                  </div>
-
-                  <p className="text-[11px] text-[#94a3b8] mt-1.5">{o.contacted} contacted</p>
-                  <ChannelTip name={o.label} contacted={o.contacted} responses={o.responses} />
-                  </div>
-                </div>
-              ))}
+            <SectionLabel>Outreach Funnel</SectionLabel>
+            <div className="overflow-x-auto pb-2">
+              <OutreachFunnel />
             </div>
           </section>
         </main>

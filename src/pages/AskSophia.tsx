@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CARD_GRADIENT } from '../theme';
+import { WandelBadge, CHATBOT_CARD_HOVER, CHATBOT_COMPOSER_GLOW } from '../components/SophiaChrome';
 
 interface Message {
   id: number;
@@ -38,30 +40,6 @@ const CATEGORIES: Category[] = [
     prompt: "Summarise the candidate pipeline for one of my open positions.",
     icon: (
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-    ),
-  },
-  {
-    label: 'Draft an outreach message',
-    description: 'Write a message to send to a candidate.',
-    prompt: 'Draft an outreach message to a candidate for one of my positions.',
-    icon: (
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-    ),
-  },
-  {
-    label: 'Find top candidates',
-    description: 'Surface the best matches for a given role.',
-    prompt: 'Find the top candidates for one of my open positions.',
-    icon: (
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" /></svg>
-    ),
-  },
-  {
-    label: 'Review a candidate',
-    description: "Get Sophia's read on a candidate's profile.",
-    prompt: "Review a candidate's profile and highlight strengths and gaps.",
-    icon: (
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
     ),
   },
 ];
@@ -130,34 +108,31 @@ export default function AskSophia() {
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#0b1437]">
+    <div className="relative flex-1 flex flex-col overflow-hidden bg-[#0b1437]">
       {/* ── Conversation ── */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="relative z-10 flex-1 min-h-0 overflow-y-auto">
         {!hasMessages ? (
           <div className="h-full flex flex-col items-center justify-center px-6 text-center animate-fade-scale-in">
-            <div className="w-11 h-11 rounded-xl bg-[#1e3a5f] flex items-center justify-center mb-4">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9L18 14z" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-gray-800">How can Sophia help?</h2>
-            <p className="mt-1.5 text-sm text-gray-500 max-w-md">
+            {/* Wandel logo badge */}
+            <WandelBadge className="mb-4" />
+            <h2 className="text-xl font-semibold text-white">How can Sophia help?</h2>
+            <p className="mt-1.5 text-sm text-slate-300 max-w-md">
               Pick a category to get started, or ask Sophia anything below.
             </p>
 
-            <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3 w-full max-w-2xl">
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 auto-rows-fr gap-4 w-full max-w-2xl">
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat.label}
                   onClick={() => pickCategory(cat)}
-                  className="flex flex-col items-start text-left gap-1 rounded-xl border border-gray-200 bg-white shadow-sm px-4 py-3 transition-all duration-150 hover:border-[#1e3a5f]/40 hover:shadow-[0_0_0_4px_rgba(30,58,95,0.08)]"
+                  style={{ background: CARD_GRADIENT }}
+                  className={`flex flex-col items-start text-left gap-1.5 h-full rounded-xl border border-gray-200 shadow-md px-5 py-4 ${CHATBOT_CARD_HOVER}`}
                 >
-                  <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#1e3a5f]/[0.06] text-[#1e3a5f] [&_svg]:w-5 [&_svg]:h-5">
+                  <span className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#1e3a5f]/10 text-[#1e3a5f] [&_svg]:w-6 [&_svg]:h-6">
                     {cat.icon}
                   </span>
-                  <span className="mt-1 text-sm font-semibold text-gray-800">{cat.label}</span>
-                  <span className="text-[11px] leading-snug text-gray-500">{cat.description}</span>
+                  <span className="mt-1.5 text-[15px] font-semibold text-gray-800">{cat.label}</span>
+                  <span className="text-xs leading-snug text-gray-500">{cat.description}</span>
                 </button>
               ))}
             </div>
@@ -183,9 +158,9 @@ export default function AskSophia() {
       </div>
 
       {/* ── Composer ── */}
-      <div className="shrink-0 px-4 pb-5 pt-2">
+      <div className="relative z-10 shrink-0 px-4 pb-5 pt-2">
         <div className="mx-auto max-w-3xl">
-          <div className="rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-150 focus-within:border-[#1e3a5f]/40 focus-within:shadow-[0_0_0_4px_rgba(30,58,95,0.08)]">
+          <div style={{ background: CARD_GRADIENT }} className={`rounded-2xl border border-gray-200 shadow-sm ${CHATBOT_COMPOSER_GLOW}`}>
             <textarea
               ref={taRef}
               value={draft}

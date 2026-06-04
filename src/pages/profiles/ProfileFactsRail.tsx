@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import wandelLogo from '../../assets/wandel-logo.png';
 import type { Candidate } from '../../types';
+import { CARD_GRADIENT } from '../../theme';
 import { ChannelIcon } from '../../components/ChannelBadge';
 import {
   ageFromDob, formatDate, formatSalary, driversLicenseLabel, initials,
@@ -18,9 +19,6 @@ const EMPLOYMENT_LABEL: Record<string, string> = {
   'not-interested': 'Not interested',
 };
 
-/* Same pastel fill as the dashboard position cards (light). */
-const CARD_GRADIENT =
-  'linear-gradient(135deg, rgba(82,249,255,0.035) 0%, rgba(82,82,255,0.028) 26%, rgba(255,0,184,0.04) 52%, rgba(255,235,82,0.025) 100%), #ffffff';
 const WANDEL_INDIGO = 'brightness(0) saturate(100%) invert(57%) sepia(73%) saturate(1752%) hue-rotate(213deg) brightness(99%) contrast(96%)';
 
 /* Dark glass panel (top bar). */

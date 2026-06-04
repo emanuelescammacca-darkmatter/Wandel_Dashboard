@@ -689,11 +689,13 @@ export function AnalysisView({
   candidateCount,
   getEval,
   fullWidth = false,
+  dark = false,
 }: {
   criteria: CriteriaBlock[];
   candidateCount: number;
   getEval: (cid: string, bid: string) => CellEval;
   fullWidth?: boolean;
+  dark?: boolean;
 }) {
   const candidates = mockCandidates.slice(0, candidateCount);
 
@@ -721,21 +723,27 @@ export function AnalysisView({
   const completionPct = totalCells > 0 ? Math.round((totalComplete / totalCells) * 100) : 0;
   const top = ranked[0]?.candidate;
 
+  const labelCls = dark ? 'text-[#94a3b8]' : 'text-gray-400';
+  const emptyCard = dark ? 'border-white/10 bg-[#111a3c] text-[#94a3b8]' : 'border-gray-200 bg-white text-gray-400';
+  const panel = dark ? 'border-white/10 bg-[#111a3c]' : 'border-gray-200 bg-white';
+  const chip = dark ? 'bg-white/[0.05] border-white/10 text-[#cbd5e1]' : 'bg-gray-50 border-gray-200 text-gray-600';
+  const chipDot = dark ? 'bg-[#475569]' : 'bg-gray-300';
+
   return (
     <div className={`px-5 pt-5 pb-8 flex flex-col gap-5 ${fullWidth ? '' : 'max-w-5xl mx-auto'}`}>
       {/* Summary */}
       <div className="grid grid-cols-4 gap-3">
-        <StatCard label="Ranked" value={`${ranked.length} / ${candidates.length}`} />
-        <StatCard label="Average Score" value={`${overallAvg.toFixed(1)}/10`} />
-        <StatCard label="Completion" value={`${completionPct}%`} />
-        <StatCard label="Top" value={top ? `${top.firstName} ${top.lastName.charAt(0)}.` : '—'} />
+        <StatCard label="Ranked" value={`${ranked.length} / ${candidates.length}`} dark={dark} />
+        <StatCard label="Average Score" value={`${overallAvg.toFixed(1)}/10`} dark={dark} />
+        <StatCard label="Completion" value={`${completionPct}%`} dark={dark} />
+        <StatCard label="Top" value={top ? `${top.firstName} ${top.lastName.charAt(0)}.` : '—'} dark={dark} />
       </div>
 
       {/* Ranking list */}
       <div>
-        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Ranked Candidates</p>
+        <p className={`text-[10px] font-semibold uppercase tracking-wider mb-2 ${labelCls}`}>Ranked Candidates</p>
         {ranked.length === 0 ? (
-          <div className="border border-gray-200 rounded-xl bg-white py-12 text-center text-sm text-gray-400">
+          <div className={`border rounded-xl py-12 text-center text-sm ${emptyCard}`}>
             No evaluations yet
           </div>
         ) : (
@@ -749,6 +757,7 @@ export function AnalysisView({
                 completeCount={r.completeCount}
                 cellEvals={r.cellEvals}
                 criteria={criteria}
+                dark={dark}
               />
             ))}
           </div>
@@ -758,14 +767,14 @@ export function AnalysisView({
       {/* Unevaluated */}
       {unevaluated.length > 0 && (
         <div>
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Not Evaluated</p>
-          <div className="border border-gray-200 rounded-xl bg-white px-4 py-3 flex flex-wrap gap-2">
+          <p className={`text-[10px] font-semibold uppercase tracking-wider mb-2 ${labelCls}`}>Not Evaluated</p>
+          <div className={`border rounded-xl px-4 py-3 flex flex-wrap gap-2 ${panel}`}>
             {unevaluated.map(r => (
               <span
                 key={r.candidate.id}
-                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-50 border border-gray-200 text-xs text-gray-600"
+                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs ${chip}`}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                <span className={`w-1.5 h-1.5 rounded-full ${chipDot}`} />
                 {r.candidate.firstName} {r.candidate.lastName}
               </span>
             ))}
@@ -776,11 +785,11 @@ export function AnalysisView({
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, dark = false }: { label: string; value: string; dark?: boolean }) {
   return (
-    <div className="border border-gray-200 rounded-xl bg-white p-4">
-      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
-      <p className="text-xl font-semibold text-gray-900 mt-1 truncate">{value}</p>
+    <div className={`border rounded-xl p-4 ${dark ? 'border-white/10 bg-[#111a3c]' : 'border-gray-200 bg-white'}`}>
+      <p className={`text-[10px] font-semibold uppercase tracking-wider ${dark ? 'text-[#94a3b8]' : 'text-gray-400'}`}>{label}</p>
+      <p className={`text-xl font-semibold mt-1 truncate ${dark ? 'text-white' : 'text-gray-900'}`}>{value}</p>
     </div>
   );
 }
@@ -792,6 +801,7 @@ function RankedCandidateCard({
   completeCount,
   cellEvals,
   criteria,
+  dark = false,
 }: {
   rank: number;
   candidate: Candidate;
@@ -799,37 +809,52 @@ function RankedCandidateCard({
   completeCount: number;
   cellEvals: CellEval[];
   criteria: CriteriaBlock[];
+  dark?: boolean;
 }) {
-  const rankStyles =
-    rank === 1 ? 'bg-amber-100 text-amber-700 border-amber-200' :
-    rank === 2 ? 'bg-slate-100 text-slate-700 border-slate-200' :
-    rank === 3 ? 'bg-orange-50  text-orange-700 border-orange-200' :
-                 'bg-gray-50  text-gray-500 border-gray-200';
+  const rankStyles = dark
+    ? (rank === 1 ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' :
+       rank === 2 ? 'bg-white/10 text-slate-200 border-white/15' :
+       rank === 3 ? 'bg-orange-500/15 text-orange-300 border-orange-500/30' :
+                    'bg-white/[0.05] text-slate-400 border-white/10')
+    : (rank === 1 ? 'bg-amber-100 text-amber-700 border-amber-200' :
+       rank === 2 ? 'bg-slate-100 text-slate-700 border-slate-200' :
+       rank === 3 ? 'bg-orange-50  text-orange-700 border-orange-200' :
+                    'bg-gray-50  text-gray-500 border-gray-200');
+
+  const card = dark ? 'border-white/10 bg-[#111a3c]' : 'border-gray-200 bg-white';
+  const avatar = dark ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-100 text-indigo-600';
+  const nameCls = dark ? 'text-white' : 'text-gray-900';
+  const subCls = dark ? 'text-[#94a3b8]' : 'text-gray-500';
+  const avgCls = dark ? 'text-white' : 'text-gray-900';
+  const mutedLabel = dark ? 'text-[#94a3b8]' : 'text-gray-400';
+  const doneCls = dark ? 'text-[#cbd5e1]' : 'text-gray-700';
+  const critLabel = dark ? 'text-[#cbd5e1]' : 'text-gray-600';
+  const track = dark ? 'bg-white/10' : 'bg-gray-100';
 
   return (
-    <div className="border border-gray-200 rounded-xl bg-white p-4">
+    <div className={`border rounded-xl p-4 ${card}`}>
       <div className="flex items-center gap-4">
         <div className={`shrink-0 w-10 h-10 rounded-full border flex items-center justify-center font-bold text-sm ${rankStyles}`}>
           #{rank}
         </div>
-        <div className="shrink-0 w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-xs">
+        <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center font-semibold text-xs ${avatar}`}>
           {candidate.firstName.charAt(0)}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">
+          <p className={`text-sm font-semibold truncate ${nameCls}`}>
             {candidate.firstName} {candidate.lastName}
           </p>
-          <p className="text-xs text-gray-500 truncate">{candidate.jobTitle}</p>
+          <p className={`text-xs truncate ${subCls}`}>{candidate.jobTitle}</p>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-2xl font-bold text-gray-900 leading-none">{avg.toFixed(1)}</p>
-          <p className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">avg / 10</p>
+          <p className={`text-2xl font-bold leading-none ${avgCls}`}>{avg.toFixed(1)}</p>
+          <p className={`text-[10px] uppercase tracking-wider mt-0.5 ${mutedLabel}`}>avg / 10</p>
         </div>
         <div className="shrink-0 text-right ml-3">
-          <p className="text-sm font-semibold text-gray-700 leading-none">
-            {completeCount}<span className="text-gray-400 font-normal">/{criteria.length}</span>
+          <p className={`text-sm font-semibold leading-none ${doneCls}`}>
+            {completeCount}<span className={`font-normal ${mutedLabel}`}>/{criteria.length}</span>
           </p>
-          <p className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">done</p>
+          <p className={`text-[10px] uppercase tracking-wider mt-0.5 ${mutedLabel}`}>done</p>
         </div>
       </div>
 
@@ -838,7 +863,7 @@ function RankedCandidateCard({
           const score = cellEvals[i]?.score ?? null;
           const pct = score !== null ? score * 10 : 0;
           const barColor =
-            score === null ? 'bg-gray-200' :
+            score === null ? (dark ? 'bg-white/15' : 'bg-gray-200') :
             b.scoring === 'binary'
               ? (score >= 5 ? 'bg-emerald-500' : 'bg-rose-400')
               : (score >= 7 ? 'bg-emerald-500' : score >= 5 ? 'bg-amber-400' : 'bg-rose-400');
@@ -847,17 +872,17 @@ function RankedCandidateCard({
             : b.scoring === 'binary' ? (score >= 5 ? 'Yes' : 'No')
             : `${score}`;
           const valueColor =
-            score === null ? 'text-gray-400'
+            score === null ? mutedLabel
             : b.scoring === 'binary'
-              ? (score >= 5 ? 'text-emerald-700' : 'text-rose-700')
-              : 'text-gray-700';
+              ? (score >= 5 ? (dark ? 'text-emerald-300' : 'text-emerald-700') : (dark ? 'text-rose-300' : 'text-rose-700'))
+              : (dark ? 'text-[#cbd5e1]' : 'text-gray-700');
           return (
             <div key={b.id}>
               <div className="flex items-center justify-between mb-1 gap-2">
-                <p className="text-[11px] text-gray-600 truncate">{b.title}</p>
+                <p className={`text-[11px] truncate ${critLabel}`}>{b.title}</p>
                 <p className={`text-[11px] font-semibold shrink-0 ${valueColor}`}>{valueText}</p>
               </div>
-              <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+              <div className={`h-1.5 w-full rounded-full overflow-hidden ${track}`}>
                 <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
               </div>
             </div>

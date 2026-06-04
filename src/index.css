@@ -25,6 +25,85 @@
   animation: pulseGlow 2.4s ease-in-out infinite;
 }
 
+/* ── Outreach funnel animation ─────────────────────────────────────────
+   Each node's border carries a rotating "loading" glow; once per cycle a
+   signal travels each connector into the Wandel hub, which then pulses. */
+@property --funnel-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes funnelBorderSpin {
+  to { --funnel-angle: 360deg; }
+}
+.funnel-node {
+  position: relative;
+}
+.funnel-node::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;            /* matches rounded-xl */
+  padding: 2px;                   /* glow ring thickness */
+  background: conic-gradient(from var(--funnel-angle),
+    rgba(129, 140, 248, 0) 0deg,
+    rgba(129, 140, 248, 0) 215deg,
+    rgba(129, 140, 248, 0.85) 295deg,
+    rgba(199, 210, 254, 1) 350deg,
+    rgba(129, 140, 248, 0) 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+  animation: funnelBorderSpin var(--funnel-T, 3.4s) linear infinite;
+  pointer-events: none;
+}
+@keyframes funnelHubPulse {
+  0%   { transform: scale(1.16); filter: drop-shadow(0 0 16px rgba(129, 140, 248, 0.85)); }
+  16%  { transform: scale(1);    filter: drop-shadow(0 0 0 rgba(129, 140, 248, 0)); }
+  100% { transform: scale(1);    filter: drop-shadow(0 0 0 rgba(129, 140, 248, 0)); }
+}
+.funnel-hub-pulse {
+  animation: funnelHubPulse var(--funnel-T, 3.4s) ease-out infinite;
+  will-change: transform;
+}
+/* Alternative to the rotating border: a very subtle cyan glow that flares only
+   at the very start of each cycle — i.e. as the node's signal leaves — then fades
+   for the rest of the cycle. --glow-dur / --glow-delay are set per node so the
+   flare stays in sync with that node's outgoing signal (matching its dur/begin). */
+@keyframes funnelNodePulse {
+  0%   { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+  6%   { box-shadow: 0 0 16px 1px rgba(34, 211, 238, 0.35); }
+  26%  { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+}
+.funnel-node-pulse {
+  position: relative;
+  border-radius: 12px;                              /* matches rounded-xl */
+  animation: funnelNodePulse var(--glow-dur, 3s) ease-out infinite;
+  animation-delay: var(--glow-delay, 0s);
+}
+/* Candidate cards streaming out of HR Team into the position nodes: pop out of HR,
+   travel to the target node (--tx/--ty set per card), then shrink + fade as they're
+   "absorbed". --flow-dur / --flow-delay desync each stream. */
+@keyframes candidateFlow {
+  0%   { transform: translate(0, 0) scale(0.4); opacity: 0; }
+  12%  { transform: translate(0, 0) scale(1);   opacity: 1; }
+  80%  { transform: translate(var(--tx), var(--ty)) scale(0.92); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0.12); opacity: 0; }
+}
+.candidate-flow {
+  opacity: 0;                                       /* hidden until the animation drives it (and under reduced motion) */
+  animation: candidateFlow var(--flow-dur, 4s) var(--flow-delay, 0s) ease-in-out infinite;
+  will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .funnel-node::before,
+  .funnel-node-pulse,
+  .candidate-flow,
+  .funnel-hub-pulse { animation: none; }
+}
+
 /* Lighter, thin scrollbar for the dark sidebar nav */
 .sidebar-scroll {
   scrollbar-width: thin;

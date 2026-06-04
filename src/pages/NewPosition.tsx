@@ -1,4 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { CARD_GRADIENT } from '../theme';
+import { WandelBadge, CHATBOT_CARD_HOVER, CHATBOT_COMPOSER_GLOW } from '../components/SophiaChrome';
 
 interface Message {
   id: number;
@@ -12,98 +14,185 @@ interface DocSection {
   bullets?: string[];
 }
 
+// A premade job-description outline: top-level sections, each holding several
+// sub-blocks. Each sub-block is a fillable slot (header above a quote box).
+interface DocBlock {
+  heading: string;
+  // Follow-up screening questions shown (with arrow icons) under this block on the
+  // Follow-up step — questions not already covered by the job description itself.
+  questions?: string[];
+}
+interface DocGroup {
+  header: string;
+  blocks: DocBlock[];
+}
+
 interface Step {
   label: string;
   docTitle: string;
   description: string;
   sections: DocSection[];
+  preview?: boolean;
+  // Render this step's section bullets with a down-then-right elbow connector
+  // (instead of plain dots), so each item reads as branching off its section.
+  arrowBullets?: boolean;
+  // When set, the doc panel renders these premade groups instead of `sections`:
+  // a larger header per group, then each sub-block as a header ABOVE a quote block
+  // that shows "…" (grey) while empty and the typed body (black) once filled.
+  groups?: DocGroup[];
+  // When set, the grouped render also shows each block's `questions` as arrow-icon
+  // follow-up questions (the Follow-up step).
+  showQuestions?: boolean;
 }
+
+// Shared job-description outline (generic, fits almost any role). Used by the
+// Position step (no questions shown) and the Follow-up step, which overlays the
+// arrow-icon screening questions — questions a recruiter asks that the JD itself
+// doesn't state (candidate motivation, experience depth, availability, expectations).
+const JOB_FRAMEWORK: DocGroup[] = [
+  {
+    header: 'Company & Role',
+    blocks: [
+      { heading: 'About the company' },
+      { heading: 'Role summary', questions: ['What attracts you to this role and our company?'] },
+    ],
+  },
+  {
+    header: 'Location & Travel',
+    blocks: [
+      { heading: 'Work location & commute' },
+      { heading: 'Travel & driving licence' },
+    ],
+  },
+  {
+    header: 'Responsibilities',
+    blocks: [
+      { heading: 'Core responsibilities' },
+      { heading: 'Day-to-day tasks' },
+    ],
+  },
+  {
+    header: 'Requirements',
+    blocks: [
+      { heading: 'Education & qualifications' },
+      {
+        heading: 'Skills & experience',
+        questions: [
+          'How many years of hands-on experience do you have in this area?',
+          'Can you walk us through a recent project you led?',
+        ],
+      },
+      { heading: 'Language requirements' },
+    ],
+  },
+  {
+    header: 'Conditions',
+    blocks: [
+      { heading: 'Start date, contract & hours', questions: ['What is your notice period and earliest possible start date?'] },
+      { heading: 'Compensation', questions: ['What are your salary expectations?'] },
+    ],
+  },
+  {
+    header: 'Benefits',
+    blocks: [
+      { heading: 'Benefits & perks' },
+      { heading: 'Learning & development' },
+    ],
+  },
+  {
+    header: 'Screening',
+    blocks: [
+      { heading: 'Questions to ask the candidate' },
+    ],
+  },
+];
+
+// Demo content for the shared job-description store (bodies[0]), one entry per
+// JOB_FRAMEWORK block in order — summarised from the example Ventilmechaniker posting.
+const MOCK_CONTENT: string[] = [
+  // Company & Role
+  'Die RENG-Gruppe ist ein wachsendes, familiengeprägtes Unternehmen mit starken Wurzeln in der Industrie- und Elektrotechnik und gestaltet an mehreren Standorten die technische Zukunft ihrer Kunden.',
+  'Als Ventilmechaniker (m/w/d) bist du für Montage, Wartung und Reparatur von Regelventilen in der Verfahrenstechnik verantwortlich und betreust Kunden technisch in der DACH-Region.',
+  // Location & Travel
+  'Standort Neustadt an der Donau. Gut erreichbar über vorhandene Bus- und Bahnverbindungen; ein eigenes Auto ist nicht zwingend erforderlich.',
+  'Führerschein Klasse B für Einsätze vor Ort erforderlich. Reisebereitschaft von ca. 30% in der DACH-Region, teils mit Übernachtung.',
+  // Responsibilities
+  'Montage, Wartung, Reparatur und Instandhaltung von Regelventilen und Durchflussanzeigen sowie technische Beratung und Unterstützung bei der Angebotserstellung.',
+  'Bearbeitung von Reparatur- und Serviceaufträgen, Erstellung der Prüfdokumentation und der Arbeits- und Materialaufmaße, Unterstützung bei technischen Abnahmen und Analyse technischer Parameter.',
+  // Requirements
+  'Abgeschlossene Ausbildung im elektrotechnischen oder mechanischen Bereich (z. B. Landmaschinen-, Industrie- oder KFZ-Mechaniker). Zusatzqualifikationen von Vorteil; Herstellerschulungen sind vorgesehen.',
+  'Grundkenntnisse in Microsoft Office und ERP-Systemen; zuverlässiger Teamplayer mit strukturierter Arbeitsweise, Kommunikationsstärke und Kundenorientierung.',
+  'Deutsch auf gutem Niveau (B2–C1) und Englisch mindestens B1.',
+  // Conditions
+  'Start ab sofort, unbefristete Festanstellung, 40 Stunden/Woche. Einsätze überwiegend vor Ort, ca. 30% im DACH-Raum mit Übernachtung.',
+  'Gehalt 45.000–50.000 € brutto/Jahr, leistungsgerechte und faire Vergütung sowie eine gute betriebliche Altersvorsorge.',
+  // Benefits
+  'Sicherer, moderner Arbeitsplatz, 30 Tage Urlaub, Lebensarbeitszeitkonto und Sonderurlaub, monatlicher Sportzuschuss (25 €) und Kinderbetreuungszuschuss (bis 75 €) sowie Mitarbeiterevents.',
+  'Förderung der persönlichen und fachlichen Weiterentwicklung durch individuelle Schulungs- und Weiterbildungsmaßnahmen.',
+  // Screening — left empty
+  '',
+];
 
 const STEPS: Step[] = [
   {
     label: 'Position',
     docTitle: 'Position Description',
     description: 'Define what the role is and the requirements the candidate must meet.',
-    sections: [
-      {
-        heading: 'Position description',
-        bullets: [
-          'Role overview & responsibilities',
-          'Requirements & qualifications',
-          'Location, working hours & start date',
-          'Compensation & benefits',
-        ],
-      },
-    ],
+    sections: [],
+    groups: JOB_FRAMEWORK,
   },
   {
     label: 'Follow-up',
     docTitle: 'Follow-up Questions',
     description: 'Set the follow-up questions to ask qualified candidates when screening.',
-    sections: [
-      { heading: 'Screening Questions', placeholder: 'Questions to ask qualified candidates.' },
-      { heading: 'What to Look For', placeholder: 'What a strong answer to each question looks like.' },
-    ],
+    sections: [],
+    // Same job-description framework as step 0, plus the arrow-icon questions.
+    groups: JOB_FRAMEWORK,
+    showQuestions: true,
   },
   {
-    label: 'Strategy',
-    docTitle: 'Outreach Strategy',
-    description: 'Choose the channels to use and when to rely on AI agents or recruiters.',
+    label: 'Preview',
+    docTitle: 'Position Preview',
+    description: 'Review the assembled position as it will appear, and fine-tune any details before publishing.',
+    preview: true,
     sections: [
-      { heading: 'Channels', placeholder: 'Which social media and sourcing channels to use, and where to post.' },
-      { heading: 'AI Agent', placeholder: 'Where and when to let the AI agent handle outreach and screening.' },
-      { heading: 'HR Recruiters', placeholder: 'When to bring in real HR recruiters and hand off to them.' },
+      { heading: 'Final Adjustments', placeholder: 'Keep chatting to refine any details — your changes update the preview live.' },
     ],
   },
 ];
 
 interface SetupCard {
   label: string;
-  example: string;
+  description: string;
+  intro: string; // assistant message shown when this format is picked
   icon: ReactNode;
 }
 
+// How the client wants to provide the position — picking any format starts the
+// same job-description flow on the right.
 const SETUP_CARDS: SetupCard[] = [
   {
-    label: 'Domain',
-    example: 'Healthcare, Logistics, IT…',
+    label: 'Chat with Sophia',
+    description: 'Describe the role in a conversation and Sophia builds it out step by step.',
+    intro: "Great — let's build the position together. Tell me about the role and I'll fill in the document on the right.",
     icon: (
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 010 18M12 3a15 15 0 000 18M12 3a9 9 0 100 18 9 9 0 000-18z" /></svg>
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.85L3 21l1.85-5A7.72 7.72 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
     ),
   },
   {
-    label: 'Seniority',
-    example: 'Junior · Mid · Senior · Lead',
+    label: 'Send a link',
+    description: 'Paste a link to an existing job posting and we’ll import the details.',
+    intro: "Sure — paste the link to the job posting and I'll pull the details into the document on the right.",
     icon: (
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M3 20h4v-7H3v7zm7 0h4V4h-4v16zm7 0h4v-11h-4v11z" /></svg>
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" /></svg>
     ),
   },
   {
-    label: 'Employment Type',
-    example: 'Full-time · Part-time · Contract',
+    label: 'Upload a document',
+    description: 'Upload a PDF or Word file and we’ll extract the position details.',
+    intro: "Sure — upload the job description (PDF or Word) and I'll extract the details into the document on the right.",
     icon: (
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-    ),
-  },
-  {
-    label: 'Work Model',
-    example: 'On-site · Hybrid · Remote',
-    icon: (
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h12a1 1 0 001-1V10" /></svg>
-    ),
-  },
-  {
-    label: 'Location',
-    example: 'City / region',
-    icon: (
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 21s7-5.5 7-11a7 7 0 10-14 0c0 5.5 7 11 7 11z" /><circle cx="12" cy="10" r="2.5" strokeWidth={1.7} /></svg>
-    ),
-  },
-  {
-    label: 'Compensation',
-    example: 'Salary range & benefits',
-    icon: (
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" strokeWidth={1.7} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M14.5 9.5a2.5 2.5 0 00-2.5-1.5c-1.4 0-2.5.9-2.5 2s1.1 2 2.5 2 2.5.9 2.5 2-1.1 2-2.5 2a2.5 2.5 0 01-2.5-1.5M12 6.5v11" /></svg>
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 16V4m0 0L8 8m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" /></svg>
     ),
   },
 ];
@@ -118,10 +207,34 @@ function CheckIcon({ className = 'w-4 h-4' }: { className?: string }) {
   );
 }
 
+// Down-then-right elbow connector used as the bullet marker on the Follow-up
+// step, so each question visibly branches off (and belongs to) its section block.
+function BulletConnector() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="shrink-0 text-indigo-400 mt-[-3px]"
+      width="16"
+      height="22"
+      viewBox="0 0 16 22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.4}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {/* drop down from the section, round the corner, run right */}
+      <path d="M3 0 V10 a3 3 0 0 0 3 3 H13" />
+      {/* arrowhead pointing right */}
+      <path d="M10.5 10.5 L13.5 13 L10.5 15.5" />
+    </svg>
+  );
+}
+
 function Arrow({ active }: { active: boolean }) {
   return (
     <svg
-      className={`w-16 h-3 shrink-0 transition-colors ${active ? 'text-[#1e3a5f]' : 'text-gray-300'}`}
+      className={`w-16 h-3 shrink-0 transition-colors ${active ? 'text-indigo-400' : 'text-white/20'}`}
       viewBox="0 0 64 12"
       fill="none"
       stroke="currentColor"
@@ -153,7 +266,7 @@ function FlowChart({
           const isComplete = completed[i];
           const isActive = activeStep === i && !isComplete;
 
-          const titleColor = isComplete || isActive ? 'text-[#1e3a5f]' : 'text-gray-600';
+          const titleColor = isActive ? 'text-indigo-100' : isComplete ? 'text-indigo-200/90' : 'text-slate-300';
 
           return (
             <Fragment key={step.label}>
@@ -161,23 +274,25 @@ function FlowChart({
                 onClick={() => onSelect(i)}
                 className={`group relative flex flex-col items-center text-center w-64 shrink-0 rounded-2xl border px-4 py-3 transition-all duration-150 ${
                   isActive
-                    ? 'border-[#1e3a5f] bg-[#1e3a5f]/[0.06] shadow-[0_0_0_4px_rgba(30,58,95,0.08)]'
+                    ? 'border-indigo-400/70 bg-indigo-500/25 shadow-[0_0_0_4px_rgba(129,140,248,0.18),0_0_22px_rgba(129,140,248,0.35)]'
+                    : isComplete
+                    ? 'border-indigo-400/25 bg-white/[0.12]'
                     : noGlow
-                    ? 'border-gray-200 bg-[#fcfcfc] shadow-sm'
-                    : 'border-gray-200 bg-[#fcfcfc] shadow-sm hover:border-[#1e3a5f]/40 hover:shadow-[0_0_0_4px_rgba(30,58,95,0.08)]'
+                    ? 'border-white/10 bg-white/[0.10]'
+                    : 'border-white/10 bg-white/[0.10] hover:border-indigo-400/40 hover:bg-white/[0.16]'
                 }`}
                 title={step.label}
               >
                 <span className={`flex items-center gap-1.5 text-[13px] font-semibold transition-colors ${titleColor}`}>
                   Step {i + 1} - {step.label}
                   {isComplete && (
-                    <span className="inline-flex w-4 h-4 items-center justify-center rounded-full bg-[#1e3a5f] text-white">
+                    <span className="inline-flex w-4 h-4 items-center justify-center rounded-full bg-indigo-500 text-white">
                       <CheckIcon className="w-2.5 h-2.5" />
                     </span>
                   )}
                 </span>
                 {inlineDescription && (
-                  <p className="mt-1 text-[11px] leading-snug text-gray-500">{step.description}</p>
+                  <p className="mt-1 text-[11px] leading-snug text-slate-400">{step.description}</p>
                 )}
                 {hoverDescription && (
                   <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-60 px-3 py-2 rounded-md bg-neutral-700/90 text-white/90 text-[11px] leading-snug font-medium pointer-events-none select-none z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
@@ -194,9 +309,83 @@ function FlowChart({
   );
 }
 
+// ── Position preview (shown for the Preview step) ───────────────────────────
+// Compiles everything gathered in the earlier steps into a read-through of the
+// position. It stays editable: jumping back to any step (or chatting on the
+// Preview step itself) updates this view live.
+
+function PreviewSection({ heading, body }: { heading: string; body: string }) {
+  return (
+    <div className="border-l-2 border-blue-300 pl-4">
+      <h3 className="text-sm font-bold text-gray-800">{heading}</h3>
+      {body ? (
+        <p className="mt-1.5 text-sm leading-relaxed text-gray-700 whitespace-pre-wrap break-words">{body}</p>
+      ) : (
+        <p className="mt-1.5 text-sm leading-relaxed text-gray-400 italic">Nothing added yet.</p>
+      )}
+    </div>
+  );
+}
+
+function PositionPreview({ bodies }: { bodies: string[][] }) {
+  const previewIdx = STEPS.findIndex((s) => s.preview);
+  const note = bodies[previewIdx]?.[0] ?? '';
+  return (
+    <div className="flex flex-col gap-6">
+      {/* The assembled job description: the shared framework once, with each block's
+          follow-up questions inline. Content comes from the shared store (bodies[0]). */}
+      {(() => {
+        let i = 0; // flat index into bodies[0]
+        return JOB_FRAMEWORK.map((group) => (
+          <section key={group.header} className="flex flex-col gap-2.5">
+            <p className="text-[15px] font-bold text-gray-900">{group.header}</p>
+            {group.blocks.map((block) => {
+              const body = bodies[0]?.[i++] ?? '';
+              return (
+                <div key={block.heading} className="flex flex-col gap-1.5">
+                  <PreviewSection heading={block.heading} body={body} />
+                  {block.questions && block.questions.length > 0 && (
+                    <ul className="flex flex-col gap-0.5 pl-5">
+                      {block.questions.map((qq) => (
+                        <li key={qq} className="flex items-start gap-2 text-sm leading-relaxed text-gray-700">
+                          <BulletConnector />
+                          <span>{qq}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+        ));
+      })()}
+
+      {note && (
+        <section className="flex flex-col gap-2.5">
+          <p className="text-[11px] uppercase tracking-[0.08em] font-semibold text-indigo-500/80">Final Adjustments</p>
+          <PreviewSection heading="Notes" body={note} />
+        </section>
+      )}
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────
 
-const emptyBodies = () => STEPS.map((s) => s.sections.map(() => ''));
+// Number of fillable slots in a step: one per sub-block for grouped steps, else one per section.
+const slotCount = (s: Step) => (s.groups ? s.groups.reduce((n, g) => n + g.blocks.length, 0) : s.sections.length);
+const emptyBodies = () => STEPS.map((s) => Array.from({ length: slotCount(s) }, () => ''));
+// Empty bodies pre-filled with the demo job description (shared store, bodies[0]).
+const initialBodies = () => {
+  const b = emptyBodies();
+  MOCK_CONTENT.forEach((text, i) => { if (i < b[0].length) b[0][i] = text; });
+  return b;
+};
+
+// The number this new position takes in the sidebar — next after the existing
+// client positions (currently "1" and "2"), so a freshly created position is "3".
+const NEW_POSITION_NUMBER = 3;
 
 export default function NewPosition() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -204,16 +393,20 @@ export default function NewPosition() {
   const [completed, setCompleted] = useState<boolean[]>([false, false, false]);
   const [activeStep, setActiveStep] = useState<number | null>(null);
   // bodies[stepIndex][sectionIndex] = section text
-  const [bodies, setBodies] = useState<string[][]>(emptyBodies);
+  const [bodies, setBodies] = useState<string[][]>(initialBodies);
   // Onboarding flow: idle → setup cards → working (doc open)
   const [started, setStarted] = useState(false);
   const [positionName, setPositionName] = useState('');
+  // Per-sub-block "done" checkboxes (keyed by block heading; purely visual).
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const toggleChecked = (key: string) => setChecked((p) => ({ ...p, [key]: !p[key] }));
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const idRef = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const docOpen = activeStep !== null;
+  const isPreview = activeStep !== null && STEPS[activeStep].preview === true;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -236,16 +429,12 @@ export default function NewPosition() {
     });
   };
 
-  // Client picked a setup card → open the job description directly.
+  // Client picked a format → open the job description flow with a matching intro.
   const pickSetupCard = (card: SetupCard) => {
     setStarted(true);
     setMessages((prev) => [
       ...prev,
-      {
-        id: idRef.current++,
-        role: 'assistant',
-        text: `Let's build out the position details — starting with ${card.label.toLowerCase()}. Tell me about the role and I'll fill in the document on the right.`,
-      },
+      { id: idRef.current++, role: 'assistant', text: card.intro },
     ]);
     setActiveStep(0);
   };
@@ -258,11 +447,6 @@ export default function NewPosition() {
     if (activeStep === null) {
       setStarted(true);
       setPositionName(text);
-      setBodies((prev) => {
-        const next = prev.map((s) => [...s]);
-        next[0][0] = `Title: ${text}`;
-        return next;
-      });
       setMessages((prev) => [
         ...prev,
         { id: idRef.current++, role: 'user', text },
@@ -288,11 +472,19 @@ export default function NewPosition() {
       },
     ]);
 
-    // Reflect the input in the active step's first section.
+    // Reflect the input in the document. Grouped steps share one job-description
+    // store (bodies[0]) — fill its first still-empty block; otherwise append to the
+    // step's single section.
     setBodies((prev) => {
       const next = prev.map((s) => [...s]);
-      const cur = next[step][0];
-      next[step][0] = cur ? `${cur}\n${text}` : text;
+      const contentStep = STEPS[step].groups ? 0 : step;
+      let idx = 0;
+      if (STEPS[step].groups) {
+        const firstEmpty = next[0].findIndex((b) => !b);
+        idx = firstEmpty === -1 ? next[0].length - 1 : firstEmpty;
+      }
+      const cur = next[contentStep][idx];
+      next[contentStep][idx] = cur ? `${cur}\n${text}` : text;
       return next;
     });
 
@@ -321,27 +513,23 @@ export default function NewPosition() {
   const showSetup = started && !docOpen;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#f5f5f5]">
+    <div className="relative flex-1 flex flex-col overflow-hidden bg-[#0b1437]">
       {/* ── Flow chart (timeline, top center) — only after a step is started ── */}
       {docOpen && (
-        <div className="relative z-30 shrink-0 px-6 pt-2 pb-2 border-b border-gray-200 animate-fade-scale-in">
+        <div className="relative z-30 shrink-0 px-6 pt-2 pb-2 animate-fade-scale-in">
           <FlowChart completed={completed} activeStep={activeStep} onSelect={openStep} hoverDescription />
         </div>
       )}
 
       {/* ── Split area: chat | document ── */}
-      <div className="flex-1 min-h-0 flex">
+      <div className="relative z-10 flex-1 min-h-0 flex">
         {/* Chat column */}
         <div className={`flex flex-col min-h-0 ${docOpen ? 'w-1/2' : 'flex-1'}`}>
           <div className="flex-1 min-h-0 overflow-y-auto">
             {showEmpty ? (
               <div className="h-full flex flex-col items-center justify-center px-4 text-center animate-fade-scale-in">
-                <div className="w-11 h-11 rounded-xl bg-[#1e3a5f] flex items-center justify-center mb-4">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-semibold text-gray-800">Create a new position</h2>
+                <WandelBadge className="mb-4" />
+                <h2 className="text-xl font-semibold text-white">Create a new position</h2>
 
                 {/* Flow chart preview */}
                 <div className="w-full max-w-6xl mt-6">
@@ -350,29 +538,32 @@ export default function NewPosition() {
 
                 <button
                   onClick={() => setStarted(true)}
-                  className="btn-glow mt-8 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1e3a5f] text-white text-sm font-medium hover:bg-[#27496d] transition-colors"
+                  style={{ background: CARD_GRADIENT }}
+                  className={`mt-8 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-gray-200 shadow-sm text-gray-800 text-sm font-medium ${CHATBOT_CARD_HOVER}`}
                 >
                   Start with Position
                 </button>
               </div>
             ) : showSetup ? (
               <div className="h-full flex flex-col items-center justify-center px-6 text-center animate-fade-scale-in">
-                <h2 className="text-xl font-semibold text-gray-800">Tell us about the position</h2>
-                <p className="mt-1.5 text-sm text-gray-500 max-w-md">
-                  Pick a starting point — or just describe the role below. We'll guide you through the rest.
+                <WandelBadge className="mb-4" />
+                <h2 className="text-xl font-semibold text-white">How would you like to add the position?</h2>
+                <p className="mt-1.5 text-sm text-slate-300 max-w-md">
+                  Choose a format to get started — chat it through, import a link, or upload a document.
                 </p>
-                <div className="mt-6 grid grid-cols-2 md:grid-cols-3 gap-3 w-full max-w-2xl">
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 auto-rows-fr gap-4 w-full max-w-2xl">
                   {SETUP_CARDS.map((card) => (
                     <button
                       key={card.label}
                       onClick={() => pickSetupCard(card)}
-                      className="flex flex-col items-start text-left gap-1 rounded-xl border border-gray-200 bg-white shadow-sm px-4 py-3 transition-all duration-150 hover:border-[#1e3a5f]/40 hover:shadow-[0_0_0_4px_rgba(30,58,95,0.08)]"
+                      style={{ background: CARD_GRADIENT }}
+                      className={`flex flex-col items-start text-left gap-1.5 h-full rounded-xl border border-gray-200 shadow-md px-5 py-4 ${CHATBOT_CARD_HOVER}`}
                     >
-                      <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#1e3a5f]/[0.06] text-[#1e3a5f] [&_svg]:w-5 [&_svg]:h-5">
+                      <span className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#1e3a5f]/10 text-[#1e3a5f] [&_svg]:w-6 [&_svg]:h-6">
                         {card.icon}
                       </span>
-                      <span className="mt-1 text-sm font-semibold text-gray-800">{card.label}</span>
-                      <span className="text-[11px] leading-snug text-gray-500">{card.example}</span>
+                      <span className="mt-1.5 text-[15px] font-semibold text-gray-800">{card.label}</span>
+                      <span className="text-xs leading-snug text-gray-500">{card.description}</span>
                     </button>
                   ))}
                 </div>
@@ -400,7 +591,7 @@ export default function NewPosition() {
           {/* Composer */}
           <div className="shrink-0 px-4 pb-5 pt-2">
             <div className={`mx-auto ${docOpen ? 'max-w-full' : 'max-w-3xl'}`}>
-              <div className="rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-150 hover:border-[#1e3a5f]/40 hover:shadow-[0_0_0_4px_rgba(30,58,95,0.08)] focus-within:border-[#1e3a5f]/40 focus-within:shadow-[0_0_0_4px_rgba(30,58,95,0.08)]">
+              <div style={{ background: CARD_GRADIENT }} className={`rounded-2xl border border-gray-200 shadow-sm ${CHATBOT_COMPOSER_GLOW}`}>
                 <textarea
                   ref={taRef}
                   value={draft}
@@ -450,12 +641,19 @@ export default function NewPosition() {
         {/* Document panel — floating page (matches composer side/bottom margins) */}
         {docOpen && (
           <div className="w-1/2 min-h-0 flex pt-4 pb-5 pr-4 pl-1 animate-panel-in">
-            <div className="flex-1 flex flex-col min-h-0 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div
+              style={{ background: isPreview ? '#eff6ff' : '#ffffff' }}
+              className={`flex-1 flex flex-col min-h-0 rounded-2xl border shadow-sm overflow-hidden ${
+                isPreview ? 'border-blue-300' : 'border-gray-200'
+              }`}
+            >
               {/* Doc header */}
-              <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-300">
                 <div className="flex items-center gap-2 min-w-0">
-                  <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  {/* Numbered badge matching the sidebar's position numbers (the new position's number) */}
+                  <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" strokeWidth={1.6} />
+                    <text x="12" y="16.2" textAnchor="middle" fontSize="11" fontWeight="700" fill="currentColor" stroke="none">{NEW_POSITION_NUMBER}</text>
                   </svg>
                   <div className="min-w-0">
                     <span className="block text-sm font-semibold text-gray-800 truncate">{STEPS[activeStep!].docTitle}</span>
@@ -463,6 +661,11 @@ export default function NewPosition() {
                       <span className="block text-[11px] text-gray-400 truncate">{positionName}</span>
                     )}
                   </div>
+                  {isPreview && (
+                    <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.1em] bg-blue-500/10 text-blue-600 border border-blue-300">
+                      Preview
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -493,18 +696,121 @@ export default function NewPosition() {
 
               {/* Doc body — Notion-style sections (left rule, bold heading, no box) */}
               <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 flex flex-col gap-6">
-                {STEPS[activeStep!].sections.map((sec, i) => {
+                {isPreview ? (
+                  <PositionPreview bodies={bodies} />
+                ) : STEPS[activeStep!].groups ? (
+                  <div className="flex flex-col gap-7">
+                    {STEPS[activeStep!].groups!.map((group, gi) => {
+                      // Flat body index of this group's first sub-block.
+                      const start = STEPS[activeStep!].groups!.slice(0, gi).reduce((n, g) => n + g.blocks.length, 0);
+                      return (
+                        <section key={group.header}>
+                          {/* Larger section header standing above its sub-blocks */}
+                          <h2 className="text-[17px] font-bold text-gray-900 mb-2.5">{group.header}</h2>
+                          <div className="flex flex-col gap-4">
+                            {group.blocks.map((block, bi) => {
+                              // Content is shared across grouped steps (canonical in bodies[0]),
+                              // so the Follow-up step mirrors the first step exactly.
+                              const body = bodies[0][start + bi];
+                              const filled = !!body;
+
+                              // Follow-up step (step 2): plain block + arrow questions, each with its own checkbox.
+                              if (STEPS[activeStep!].showQuestions) {
+                                return (
+                                  <div key={block.heading} className="border-l-2 border-gray-300 pl-4">
+                                    <h3 className={`text-sm font-semibold mb-1 ${filled ? 'text-gray-800' : 'text-gray-400 italic'}`}>{block.heading}</h3>
+                                    {filled ? (
+                                      <p className="text-sm leading-relaxed text-gray-900 whitespace-pre-wrap break-words">{body}</p>
+                                    ) : (
+                                      <p className="text-sm leading-relaxed text-gray-400 select-none">…</p>
+                                    )}
+                                    {block.questions && block.questions.length > 0 && (
+                                      <ul className="mt-2 flex flex-col gap-0.5 pl-1">
+                                        {block.questions.map((qq) => {
+                                          const qChecked = !!checked[qq];
+                                          return (
+                                            <li
+                                              key={qq}
+                                              className={`flex items-start gap-1.5 text-sm leading-relaxed rounded-md py-1.5 pl-1.5 pr-2 transition-colors ${qChecked ? 'bg-blue-50 text-gray-800' : 'text-gray-700'}`}
+                                            >
+                                              <BulletConnector />
+                                              {/* Subtle done-checkbox in front of the question (next to the arrow) */}
+                                              <button
+                                                type="button"
+                                                role="checkbox"
+                                                aria-checked={qChecked}
+                                                aria-label={`Mark “${qq}” done`}
+                                                onClick={() => toggleChecked(qq)}
+                                                className={`shrink-0 mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                                                  qChecked
+                                                    ? 'bg-blue-100 border-blue-300 text-blue-600'
+                                                    : 'bg-white border-gray-300 hover:border-gray-400 text-transparent'
+                                                }`}
+                                              >
+                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                              </button>
+                                              <span>{qq}</span>
+                                            </li>
+                                          );
+                                        })}
+                                      </ul>
+                                    )}
+                                  </div>
+                                );
+                              }
+
+                              // Position step (step 1): a checkbox next to each block title; checking shades the block.
+                              const isChecked = !!checked[block.heading];
+                              return (
+                                <div
+                                  key={block.heading}
+                                  className={`border-l-2 rounded-r-md pl-4 pr-3 py-2 transition-colors ${isChecked ? 'border-blue-300 bg-blue-50' : 'border-gray-300'}`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {/* Subtle done-checkbox in front of the block title */}
+                                    <button
+                                      type="button"
+                                      role="checkbox"
+                                      aria-checked={isChecked}
+                                      aria-label={`Mark “${block.heading}” done`}
+                                      onClick={() => toggleChecked(block.heading)}
+                                      className={`shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                                        isChecked
+                                          ? 'bg-blue-100 border-blue-300 text-blue-600'
+                                          : 'bg-white border-gray-300 hover:border-gray-400 text-transparent'
+                                      }`}
+                                    >
+                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                    </button>
+                                    <h3 className={`text-sm font-semibold ${filled ? 'text-gray-800' : 'text-gray-400 italic'}`}>{block.heading}</h3>
+                                  </div>
+                                  {filled ? (
+                                    <p className="mt-1 text-sm leading-relaxed text-gray-900 whitespace-pre-wrap break-words">{body}</p>
+                                  ) : (
+                                    <p className="mt-1 text-sm leading-relaxed text-gray-400 select-none">…</p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  STEPS[activeStep!].sections.map((sec, i) => {
                   const body = bodies[activeStep!][i];
                   const filled = !!body;
+                  const arrowBullets = STEPS[activeStep!].arrowBullets;
 
-                  // Bullet-template section (Position view): grey/italic until a description is added, then black.
+                  // Bullet-template section (Follow-up step): grey/italic until described, then black.
                   if (sec.bullets) {
                     return (
                       <div key={sec.heading} className="border-l-2 border-gray-400 pl-4">
                         <h3 className={`text-sm font-bold ${filled ? 'text-gray-900' : 'text-gray-400 italic'}`}>
                           {sec.heading}
                         </h3>
-                        <ul className="mt-2 flex flex-col gap-1.5">
+                        <ul className={`mt-2 flex flex-col ${arrowBullets ? 'gap-0.5 pl-1' : 'gap-1.5'}`}>
                           {sec.bullets.map((b) => (
                             <li
                               key={b}
@@ -512,7 +818,11 @@ export default function NewPosition() {
                                 filled ? 'text-gray-700' : 'text-gray-400 italic'
                               }`}
                             >
-                              <span className={`mt-[7px] w-1 h-1 rounded-full shrink-0 ${filled ? 'bg-gray-500' : 'bg-gray-300'}`} />
+                              {arrowBullets ? (
+                                <BulletConnector />
+                              ) : (
+                                <span className={`mt-[7px] w-1 h-1 rounded-full shrink-0 ${filled ? 'bg-gray-500' : 'bg-gray-300'}`} />
+                              )}
                               <span>{b}</span>
                             </li>
                           ))}
@@ -531,7 +841,8 @@ export default function NewPosition() {
                       )}
                     </div>
                   );
-                })}
+                  })
+                )}
               </div>
             </div>
           </div>
