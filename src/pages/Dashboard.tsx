@@ -48,6 +48,14 @@ type Pos = {
   channels: Record<ChannelKey, [number, number]>; // [contacted, responses]
 };
 
+/* Where each position's "Review candidates" link jumps to. Falls back to the
+   shared position workspace for positions without a dedicated route. */
+const POSITION_PATH: Record<string, string> = {
+  'Servicetechniker für Kaffeeautomaten': '/clients/positions',
+  Lagerlogistiker: '/clients/positions-2',
+};
+const positionPath = (title: string) => POSITION_PATH[title] ?? '/clients/positions';
+
 const POSITIONS: Pos[] = [
   {
     title: 'Servicetechniker für Kaffeeautomaten', status: 'Open',
@@ -464,7 +472,7 @@ export function CandidateCard({ c, selectable = false, selected = false, onToggl
     <div
       onClick={selectable ? onToggle : go}
       className={`relative rounded-2xl border bg-white flex flex-col shrink-0 cursor-pointer transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] ${selected ? 'border-indigo-400 ring-2 ring-indigo-300' : 'border-[#e2e8f0] hover:border-[#c7d2fe]'}`}
-      style={{ width: 360, minWidth: 360, minHeight: 248, padding: '18px 20px', scrollSnapAlign: 'start' }}
+      style={{ width: 'clamp(300px, 25vw, 380px)', minHeight: 248, padding: '18px 20px', scrollSnapAlign: 'start' }}
     >
       {/* selection checkbox (only in selectable mode) */}
       {selectable && (
@@ -519,15 +527,17 @@ export const ALL_CANDIDATES = [...CANDIDATES, ...CANDIDATES_MORE];
 /* ── Inner position content (no card chrome) — reused by the collapsed card
    and as the left column of the expanded full-width card. ── */
 function PositionDetails({ p, phase = 0, weekIndex = 0 }: { p: Pos; phase?: number; weekIndex?: number }) {
+  const navigate = useNavigate();
   const pulse = PULSE_BY_TITLE[p.title];
   const focus = FOCUS_BY_TITLE[p.title];
+  const goToPosition = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); navigate(positionPath(p.title)); };
 
   if (focus) {
     return (
       <div className="flex flex-col h-full">
         <FocusSummary title={p.title} d={focus} phase={phase} weekIndex={weekIndex} />
         <div className="mt-auto pt-3 flex justify-end">
-          <a href="#" onClick={e => e.stopPropagation()} className="text-[12px] font-medium text-[#4f46e5] no-underline rounded-lg px-3 py-1.5 border border-transparent transition-colors hover:bg-white/70 hover:border-[#e6e9f3] hover:shadow-sm">Review candidates →</a>
+          <a href="#" onClick={goToPosition} className="text-[12px] font-medium text-[#4f46e5] no-underline rounded-lg px-3 py-1.5 border border-transparent transition-colors hover:bg-white/70 hover:border-[#e6e9f3] hover:shadow-sm">Review candidates →</a>
         </div>
       </div>
     );
@@ -608,7 +618,7 @@ function PositionDetails({ p, phase = 0, weekIndex = 0 }: { p: Pos; phase?: numb
 
       {/* Section 6 — footer */}
       <div className="mt-auto pt-2.5 flex justify-end">
-        <a href="#" onClick={e => e.stopPropagation()} className="text-[12px] font-medium text-[#4f46e5] no-underline rounded-lg px-3 py-1.5 border border-transparent transition-colors hover:bg-white/70 hover:border-[#e6e9f3] hover:shadow-sm">
+        <a href="#" onClick={goToPosition} className="text-[12px] font-medium text-[#4f46e5] no-underline rounded-lg px-3 py-1.5 border border-transparent transition-colors hover:bg-white/70 hover:border-[#e6e9f3] hover:shadow-sm">
           {pulse ? 'Review candidates →' : 'View position →'}
         </a>
       </div>
@@ -622,7 +632,7 @@ function PositionCard({ p, onSelect }: { p: Pos; onSelect?: () => void }) {
     <div
       onClick={onSelect}
       className="rounded-[10px] border border-[#e2e8f0] flex flex-col shrink-0 cursor-pointer transition-all duration-200 hover:-translate-y-[3px] hover:border-[#c7d2fe] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
-      style={{ minWidth: 420, width: 420, padding: '20px 20px 14px', scrollSnapAlign: 'start', background: CARD_GRADIENT }}
+      style={{ width: 'clamp(360px, 30vw, 460px)', padding: '20px 20px 14px', scrollSnapAlign: 'start', background: CARD_GRADIENT }}
     >
       <PositionDetails p={p} />
     </div>
@@ -1389,15 +1399,17 @@ function FocusSummary({ title, d, phase = 0, weekIndex = 0 }: { title: string; d
 }
 
 function PositionFocusCard({ p, d, onSelect, phase = 0, weekIndex = 0 }: { p: Pos; d: FocusData; onSelect?: () => void; phase?: number; weekIndex?: number }) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const shown = open ? d.candidates : d.candidates.slice(0, d.initialCount);
   const moreCount = d.candidates.length - d.initialCount;
   const stop = (e: React.MouseEvent) => e.stopPropagation();
+  const goToPosition = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); navigate(positionPath(p.title)); };
   return (
     <div
       onClick={onSelect}
       className="rounded-[10px] border border-[#e2e8f0] shadow-[0_8px_24px_rgba(0,0,0,0.06)] shrink-0 cursor-pointer animate-fade-scale-in transition-all duration-200 hover:-translate-y-[3px] hover:border-[#c7d2fe] hover:shadow-[0_12px_30px_rgba(0,0,0,0.10)]"
-      style={{ width: 720, minWidth: 720, padding: '22px 24px 16px', scrollSnapAlign: 'start', background: CARD_GRADIENT }}
+      style={{ width: 'clamp(560px, 48vw, 880px)', padding: '22px 24px 16px', scrollSnapAlign: 'start', background: CARD_GRADIENT }}
     >
       <FocusSummary title={p.title} d={d} phase={phase} weekIndex={weekIndex} />
 
@@ -1427,7 +1439,7 @@ function PositionFocusCard({ p, d, onSelect, phase = 0, weekIndex = 0 }: { p: Po
 
       <div className="h-px bg-[#e2e8f0] mt-4 mb-3" />
       <div className="flex justify-end">
-        <a href="#" onClick={stop} className="text-[13px] font-medium text-[#4f46e5] no-underline rounded-lg px-3 py-1.5 border border-transparent transition-colors hover:bg-white/70 hover:border-[#e6e9f3] hover:shadow-sm">Review all candidates →</a>
+        <a href="#" onClick={goToPosition} className="text-[13px] font-medium text-[#4f46e5] no-underline rounded-lg px-3 py-1.5 border border-transparent transition-colors hover:bg-white/70 hover:border-[#e6e9f3] hover:shadow-sm">Review all candidates →</a>
       </div>
     </div>
   );
@@ -1643,9 +1655,9 @@ export default function Dashboard() {
     <div className="flex-1 flex flex-col min-h-0" style={{ background: '#0b1437' }}>
 
       {/* ══ Zone 1 — Compact storytelling hero ══ */}
-      <header className="shrink-0" style={{ background: '#0b1437', padding: '18px 28px 4px' }}>
+      <header className="shrink-0 px-4 sm:px-6 lg:px-8 pt-4 lg:pt-[18px] pb-1" style={{ background: '#0b1437' }}>
         <div
-          className="relative rounded-2xl border border-white/[0.08] px-7 py-5 flex items-center justify-between gap-8 flex-wrap"
+          className="relative rounded-2xl border border-white/[0.08] px-5 sm:px-7 py-5 flex items-center justify-between gap-x-8 gap-y-5 flex-wrap"
           style={{ background: 'linear-gradient(120deg, #151e4a 0%, #1b2456 46%, #251a54 100%)' }}
         >
           {/* soft momentum glow — clipped to the card so it can't spill, while the
@@ -1664,8 +1676,8 @@ export default function Dashboard() {
           </div>
 
           {/* metrics + week selector */}
-          <div className="relative z-10 flex items-center gap-7">
-            <div className="flex items-center gap-7">
+          <div className="relative z-10 flex items-center gap-x-5 sm:gap-7 gap-y-4 flex-wrap">
+            <div className="flex items-center gap-x-5 sm:gap-7">
               <HeroMetric label="Active Positions" value={week.active} />
               <span className="w-px h-9 bg-white/[0.10]" />
               <HeroMetric label="Pipeline Growth" value={week.growth} delta={week.growthDelta} />
@@ -1712,7 +1724,7 @@ export default function Dashboard() {
       <div className="flex-1 flex min-h-0 items-stretch">
 
         {/* ── Zone 2 — Main content ── */}
-        <main className="flex-1 min-w-0 overflow-y-auto" style={{ padding: '32px 28px' }}>
+        <main className="flex-1 min-w-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
 
           {/* A. Position Overview — click a card to open its candidate strip */}
           <section>
@@ -1742,7 +1754,7 @@ export default function Dashboard() {
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
                   </button>
 
-                  <div className="shrink-0 w-[420px]">
+                  <div className="shrink-0" style={{ width: 'clamp(340px, 30vw, 460px)' }}>
                     <PositionDetails p={selectedPos} phase={selectedIdx * 1.7} weekIndex={weekIndex} />
                   </div>
 
