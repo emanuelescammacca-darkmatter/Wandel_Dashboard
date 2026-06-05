@@ -1,6 +1,12 @@
-import { useState, useEffect, type ReactNode, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useState, useEffect, useRef, type ReactNode, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { NavLink } from 'react-router-dom';
 import wandelLogo from '../assets/wandel-logo.png';
+import { useCreatedPositions } from '../positionsStore';
+
+// Numbered square badge (matches the static "1"/"2" icons) for dynamically added positions.
+const numberIcon = (n: number) => (
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5" strokeWidth={1.6} /><text x="12" y="16.2" textAnchor="middle" fontSize="11" fontWeight="700" fill="currentColor" stroke="none">{n}</text></svg>
+);
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 
@@ -49,7 +55,7 @@ const PanelOpen = (
 // ── Nav sections ──────────────────────────────────────────────────────────────
 
 type NavChild = { label: string; path: string };
-type NavItem = { label: string; path: string; icon: ReactNode; children?: NavChild[] };
+type NavItem = { label: string; path: string; icon: ReactNode; children?: NavChild[]; animateIn?: boolean };
 type NavSection = { label: string; items: NavItem[] };
 
 const NAV_SECTIONS: NavSection[] = [
@@ -113,6 +119,16 @@ export default function Sidebar() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [width, setWidth] = useState(208); // expanded width (px), drag-resizable
   const [resizing, setResizing] = useState(false);
+  const created = useCreatedPositions(); // positions added via the New Position flow
+  const navRef = useRef<HTMLElement>(null);
+
+  // When a position is added, scroll the nav to the bottom so the new entry (last in the
+  // "Positions - Clients" section) comes into view.
+  useEffect(() => {
+    if (created.length === 0) return;
+    const el = navRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [created.length]);
   const toggleExpand = (path: string) =>
     setExpanded((prev) => ({ ...prev, [path]: !prev[path] }));
 
@@ -159,14 +175,22 @@ export default function Sidebar() {
         {/* Logo + name — hidden when collapsed */}
         {!collapsed && (
           <div className="flex items-center gap-2 shrink-0">
-            <div style={{ height: '24px', overflow: 'hidden', flexShrink: 0 }}>
-              <img
-                src={wandelLogo}
-                alt="Wandel"
-                style={{ filter: 'brightness(0) invert(1)', height: '30px', width: 'auto', display: 'block' }}
-              />
-            </div>
-            <span className="text-white/90 font-semibold text-[14px] tracking-wide leading-none">Wandel</span>
+            {/* Cropped white glyph, vertically centred so it sits level with the title */}
+            <span
+              role="img"
+              aria-label="Wandel"
+              className="shrink-0"
+              style={{
+                width: 26,
+                height: 26,
+                backgroundImage: `url(${wandelLogo})`,
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: '37.57px 37.57px',
+                backgroundPosition: '-5.98px -3.12px',
+                filter: 'brightness(0) invert(1)',
+              }}
+            />
+            <span className="text-white/90 font-semibold text-[18px] tracking-wide leading-none">Wandel</span>
           </div>
         )}
 
@@ -174,15 +198,29 @@ export default function Sidebar() {
         <button
           onClick={() => setCollapsed(!collapsed)}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="w-6 h-6 flex items-center justify-center rounded text-white/45 hover:text-white/80 hover:bg-white/6 transition-colors shrink-0"
+          className="w-8 h-8 flex items-center justify-center rounded-md text-white/45 hover:text-white/80 hover:bg-white/6 transition-colors shrink-0"
         >
           <span className="w-4.5 h-4.5">{collapsed ? PanelOpen : PanelClose}</span>
         </button>
       </div>
 
       {/* ── Nav ── */}
-      <nav className={`flex-1 min-h-0 pb-3 sidebar-scroll ${collapsed ? 'overflow-visible px-1' : 'overflow-y-auto px-2'}`}>
-        {NAV_SECTIONS.map((section) => (
+      <nav ref={navRef} className={`flex-1 min-h-0 pb-3 sidebar-scroll ${collapsed ? 'overflow-visible px-1' : 'overflow-y-auto px-2'}`}>
+        {NAV_SECTIONS.map((section) => {
+          // Append user-created positions to the client-positions section as they're added.
+          const items: NavItem[] =
+            section.label === 'Positions - Clients'
+              ? [
+                  ...section.items,
+                  ...created.map((p) => ({
+                    label: p.name,
+                    path: '/clients/positions',
+                    icon: numberIcon(p.id),
+                    animateIn: true,
+                  })),
+                ]
+              : section.items;
+          return (
           <div key={section.label} className="mt-5">
 
             {!collapsed && (
@@ -195,11 +233,11 @@ export default function Sidebar() {
             )}
 
             <div className="flex flex-col gap-px">
-              {section.items.map((item) => {
+              {items.map((item, i) => {
                 const isOpen = !!expanded[item.path];
                 const hasChildren = !!item.children && !collapsed;
                 return (
-                  <div key={item.path} className="relative">
+                  <div key={`${section.label}:${i}`} className={`relative ${item.animateIn ? 'animate-fade-scale-in' : ''}`}>
                     <div className="relative group/nav">
                       <NavLink
                         to={item.path}
@@ -257,7 +295,7 @@ export default function Sidebar() {
 
                     {/* Sub-pages */}
                     {hasChildren && isOpen && (
-                      <div className="mt-px mb-1 flex flex-col gap-px pl-5 pr-1">
+                      <div className="mt-px mb-1 flex flex-col gap-px pl-6">
                         {item.children!.map((child) => (
                           <NavLink
                             key={child.path}
@@ -280,7 +318,8 @@ export default function Sidebar() {
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* ── Account button ── */}

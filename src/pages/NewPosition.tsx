@@ -1,6 +1,9 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CARD_GRADIENT } from '../theme';
-import { WandelBadge, CHATBOT_CARD_HOVER, CHATBOT_COMPOSER_GLOW } from '../components/SophiaChrome';
+import { WandelBadge, ChatMessage, WaveBackground, CHATBOT_CARD_HOVER, CHATBOT_COMPOSER_GLOW } from '../components/SophiaChrome';
+import { useTypewriter } from '../hooks/useTypewriter';
+import { addCreatedPosition } from '../positionsStore';
 
 interface Message {
   id: number;
@@ -161,6 +164,13 @@ const STEPS: Step[] = [
   },
 ];
 
+// Pill badge shown next to the (constant) document title — one per step, each its own colour.
+const STEP_BADGES = [
+  { label: 'Details',              cls: 'bg-indigo-500/10 text-indigo-600 border-indigo-300' },
+  { label: 'Additional questions', cls: 'bg-amber-500/10 text-amber-700 border-amber-300' },
+  { label: 'Preview',              cls: 'bg-blue-500/10 text-blue-600 border-blue-300' },
+];
+
 interface SetupCard {
   label: string;
   description: string;
@@ -251,14 +261,14 @@ function FlowChart({
   onSelect,
   hoverDescription = false,
   inlineDescription = false,
-  noGlow = false,
+  clickable = true,
 }: {
   completed: boolean[];
   activeStep: number | null;
   onSelect: (i: number) => void;
   hoverDescription?: boolean;
   inlineDescription?: boolean;
-  noGlow?: boolean;
+  clickable?: boolean;
 }) {
   return (
     <div className="flex items-center justify-center gap-5 w-full">
@@ -266,24 +276,24 @@ function FlowChart({
           const isComplete = completed[i];
           const isActive = activeStep === i && !isComplete;
 
-          const titleColor = isActive ? 'text-indigo-100' : isComplete ? 'text-indigo-200/90' : 'text-slate-300';
+          const titleColor = isActive ? 'text-white' : 'text-slate-200';
+          // Hover affordance only when the chart is interactive (timeline at the top of the page).
+          const hover = clickable ? 'hover:border-indigo-400/70 hover:bg-white/10 hover:text-white' : '';
 
           return (
             <Fragment key={step.label}>
               <button
-                onClick={() => onSelect(i)}
-                className={`group relative flex flex-col items-center text-center w-64 shrink-0 rounded-2xl border px-4 py-3 transition-all duration-150 ${
+                onClick={clickable ? () => onSelect(i) : undefined}
+                className={`group relative flex flex-col items-center text-center w-64 shrink-0 rounded-2xl border px-4 py-3 text-slate-200 transition-colors ${clickable ? '' : 'cursor-default'} ${
                   isActive
-                    ? 'border-indigo-400/70 bg-indigo-500/25 shadow-[0_0_0_4px_rgba(129,140,248,0.18),0_0_22px_rgba(129,140,248,0.35)]'
+                    ? 'border-indigo-400/70 bg-white/10 text-white shadow-[0_0_0_4px_rgba(129,140,248,0.18),0_0_22px_rgba(129,140,248,0.35)]'
                     : isComplete
-                    ? 'border-indigo-400/25 bg-white/[0.12]'
-                    : noGlow
-                    ? 'border-white/10 bg-white/[0.10]'
-                    : 'border-white/10 bg-white/[0.10] hover:border-indigo-400/40 hover:bg-white/[0.16]'
+                    ? `border-indigo-400/30 bg-white/[0.07] ${hover}`
+                    : `border-white/15 bg-white/5 ${hover}`
                 }`}
                 title={step.label}
               >
-                <span className={`flex items-center gap-1.5 text-[13px] font-semibold transition-colors ${titleColor}`}>
+                <span className={`flex items-center gap-1.5 text-sm font-semibold transition-colors ${clickable ? 'group-hover:text-white' : ''} ${titleColor}`}>
                   Step {i + 1} - {step.label}
                   {isComplete && (
                     <span className="inline-flex w-4 h-4 items-center justify-center rounded-full bg-indigo-500 text-white">
@@ -292,7 +302,7 @@ function FlowChart({
                   )}
                 </span>
                 {inlineDescription && (
-                  <p className="mt-1 text-[11px] leading-snug text-slate-400">{step.description}</p>
+                  <p className="mt-1 text-[11px] leading-snug text-slate-400 group-hover:text-slate-300">{step.description}</p>
                 )}
                 {hoverDescription && (
                   <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-60 px-3 py-2 rounded-md bg-neutral-700/90 text-white/90 text-[11px] leading-snug font-medium pointer-events-none select-none z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
@@ -314,20 +324,29 @@ function FlowChart({
 // position. It stays editable: jumping back to any step (or chatting on the
 // Preview step itself) updates this view live.
 
-function PreviewSection({ heading, body }: { heading: string; body: string }) {
+function PreviewSection({ heading, body, children }: { heading: string; body: string; children?: ReactNode }) {
   return (
     <div className="border-l-2 border-blue-300 pl-4">
-      <h3 className="text-sm font-bold text-gray-800">{heading}</h3>
+      <h3 className="text-sm font-semibold text-gray-800">{heading}</h3>
       {body ? (
         <p className="mt-1.5 text-sm leading-relaxed text-gray-700 whitespace-pre-wrap break-words">{body}</p>
       ) : (
         <p className="mt-1.5 text-sm leading-relaxed text-gray-400 italic">Nothing added yet.</p>
       )}
+      {children}
     </div>
   );
 }
 
-function PositionPreview({ bodies }: { bodies: string[][] }) {
+function PositionPreview({
+  bodies,
+  checked,
+  onToggle,
+}: {
+  bodies: string[][];
+  checked: Record<string, boolean>;
+  onToggle: (key: string) => void;
+}) {
   const previewIdx = STEPS.findIndex((s) => s.preview);
   const note = bodies[previewIdx]?.[0] ?? '';
   return (
@@ -336,29 +355,49 @@ function PositionPreview({ bodies }: { bodies: string[][] }) {
           follow-up questions inline. Content comes from the shared store (bodies[0]). */}
       {(() => {
         let i = 0; // flat index into bodies[0]
-        return JOB_FRAMEWORK.map((group) => (
-          <section key={group.header} className="flex flex-col gap-2.5">
-            <p className="text-[15px] font-bold text-gray-900">{group.header}</p>
-            {group.blocks.map((block) => {
-              const body = bodies[0]?.[i++] ?? '';
-              return (
-                <div key={block.heading} className="flex flex-col gap-1.5">
-                  <PreviewSection heading={block.heading} body={body} />
-                  {block.questions && block.questions.length > 0 && (
-                    <ul className="flex flex-col gap-0.5 pl-5">
-                      {block.questions.map((qq) => (
-                        <li key={qq} className="flex items-start gap-2 text-sm leading-relaxed text-gray-700">
-                          <BulletConnector />
-                          <span>{qq}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              );
-            })}
-          </section>
-        ));
+        return JOB_FRAMEWORK.map((group) => {
+          const isChecked = !!checked[group.header];
+          return (
+            <section
+              key={group.header}
+              className={`flex flex-col gap-2.5 rounded-xl px-3 py-2.5 transition-colors ${isChecked ? 'bg-blue-50' : ''}`}
+            >
+              {/* Section header with a checkbox; ticking shades the whole section blue. */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={isChecked}
+                  aria-label={`Mark “${group.header}” done`}
+                  onClick={() => onToggle(group.header)}
+                  className={`shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                    isChecked ? 'bg-blue-100 border-blue-300 text-blue-600' : 'bg-white border-gray-300 hover:border-gray-400 text-transparent'
+                  }`}
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                </button>
+                <p className="text-[15px] font-bold text-gray-900">{group.header}</p>
+              </div>
+              {group.blocks.map((block) => {
+                const body = bodies[0]?.[i++] ?? '';
+                return (
+                  <PreviewSection key={block.heading} heading={block.heading} body={body}>
+                    {block.questions && block.questions.length > 0 && (
+                      <ul className="mt-1.5 flex flex-col gap-0.5 pl-1">
+                        {block.questions.map((qq) => (
+                          <li key={qq} className="flex items-start gap-2 text-sm leading-relaxed text-gray-700">
+                            <BulletConnector />
+                            <span>{qq}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </PreviewSection>
+                );
+              })}
+            </section>
+          );
+        });
       })()}
 
       {note && (
@@ -397,20 +436,40 @@ export default function NewPosition() {
   // Onboarding flow: idle → setup cards → working (doc open)
   const [started, setStarted] = useState(false);
   const [positionName, setPositionName] = useState('');
+  // Celebration overlay shown when the final (Preview) step is marked complete.
+  const [celebrate, setCelebrate] = useState(false);
   // Per-sub-block "done" checkboxes (keyed by block heading; purely visual).
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const toggleChecked = (key: string) => setChecked((p) => ({ ...p, [key]: !p[key] }));
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const idRef = useRef(0);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const navigate = useNavigate();
+  // Shared per-character "generating" reveal (same behaviour across all chat views).
+  const { revealed, streamingId, start, isStreaming, displayText } = useTypewriter();
 
   const docOpen = activeStep !== null;
   const isPreview = activeStep !== null && STEPS[activeStep].preview === true;
 
+  // Keep the conversation pinned to the bottom. The message list reserves space for the
+  // floating composer (pb) so the latest reply lands just above it; scrolling the container
+  // (rather than an anchor) means that reserved space stays hidden behind the composer.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: streamingId !== null ? 'auto' : 'smooth' });
+  }, [messages, revealed, streamingId]);
+
+  // After the celebration plays, move on to the newly created position's page.
+  useEffect(() => {
+    if (!celebrate) return;
+    const t = setTimeout(() => {
+      setCelebrate(false);
+      navigate('/clients/positions');
+    }, 2600);
+    return () => clearTimeout(t);
+  }, [celebrate, navigate]);
 
   // Auto-grow the composer textarea up to a max height.
   const autoGrow = () => {
@@ -432,10 +491,12 @@ export default function NewPosition() {
   // Client picked a format → open the job description flow with a matching intro.
   const pickSetupCard = (card: SetupCard) => {
     setStarted(true);
+    const assistantId = idRef.current++;
     setMessages((prev) => [
       ...prev,
-      { id: idRef.current++, role: 'assistant', text: card.intro },
+      { id: assistantId, role: 'assistant', text: card.intro },
     ]);
+    start(assistantId, card.intro);
     setActiveStep(0);
   };
 
@@ -447,30 +508,30 @@ export default function NewPosition() {
     if (activeStep === null) {
       setStarted(true);
       setPositionName(text);
+      const userId = idRef.current++;
+      const assistantId = idRef.current++;
+      const reply = `Perfect — "${text}" it is. I've opened the position details on the right; let's fill them in together.`;
       setMessages((prev) => [
         ...prev,
-        { id: idRef.current++, role: 'user', text },
-        {
-          id: idRef.current++,
-          role: 'assistant',
-          text: `Perfect — "${text}" it is. I've opened the position details on the right; let's fill them in together.`,
-        },
+        { id: userId, role: 'user', text },
+        { id: assistantId, role: 'assistant', text: reply },
       ]);
+      start(assistantId, reply);
       setActiveStep(0);
       resetComposer();
       return;
     }
 
     const step = activeStep;
+    const userId = idRef.current++;
+    const assistantId = idRef.current++;
+    const reply = `Got it — I've added that to the ${STEPS[step].docTitle} document on the right.`;
     setMessages((prev) => [
       ...prev,
-      { id: idRef.current++, role: 'user', text },
-      {
-        id: idRef.current++,
-        role: 'assistant',
-        text: `Got it — I've added that to the ${STEPS[step].docTitle} document on the right.`,
-      },
+      { id: userId, role: 'user', text },
+      { id: assistantId, role: 'assistant', text: reply },
     ]);
+    start(assistantId, reply);
 
     // Reflect the input in the document. Grouped steps share one job-description
     // store (bodies[0]) — fill its first still-empty block; otherwise append to the
@@ -500,23 +561,80 @@ export default function NewPosition() {
 
   const markComplete = () => {
     if (activeStep === null) return;
+    const step = activeStep;
     setCompleted((prev) => {
       const next = [...prev];
-      next[activeStep] = true;
+      next[step] = true;
       return next;
     });
-    const nextStep = activeStep + 1;
+    // Completing the final (Preview) step "creates" the position: add it to the sidebar
+    // and play the celebration animation instead of advancing.
+    if (STEPS[step].preview) {
+      addCreatedPosition(positionName || STEPS[step].docTitle);
+      setCelebrate(true);
+      return;
+    }
+    const nextStep = step + 1;
     if (nextStep < STEPS.length) setActiveStep(nextStep);
   };
 
   const showEmpty = !started && !docOpen;
   const showSetup = started && !docOpen;
 
+  const composer = (
+    <div style={{ background: CARD_GRADIENT }} className={`rounded-2xl border border-gray-200 shadow-sm ${CHATBOT_COMPOSER_GLOW}`}>
+      <textarea
+        ref={taRef}
+        value={draft}
+        onChange={(e) => { setDraft(e.target.value); autoGrow(); }}
+        onKeyDown={onKeyDown}
+        rows={1}
+        placeholder={docOpen ? `Describe the ${STEPS[activeStep!].label.toLowerCase()}…` : 'Describe the new position…'}
+        className="w-full resize-none bg-transparent px-4 pt-3.5 pb-2 text-sm text-gray-800 placeholder:text-gray-400 outline-none max-h-[200px]"
+      />
+
+      <div className="border-t border-gray-100" />
+
+      <div className="flex items-center justify-between px-2.5 py-2">
+        <button
+          type="button"
+          title="Attach file"
+          aria-label="Attach file"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          onClick={send}
+          disabled={!draft.trim()}
+          title="Send"
+          aria-label="Send message"
+          className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+            draft.trim()
+              ? 'bg-[#1e3a5f] text-white hover:bg-[#27496d]'
+              : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19V5m0 0l-6 6m6-6l6 6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="relative flex-1 flex flex-col overflow-hidden bg-[#0b1437]">
+    <div className="relative isolate flex-1 flex flex-col overflow-hidden bg-[#0b1437]">
+      {/* ── Background wave ── */}
+      <WaveBackground />
+
       {/* ── Flow chart (timeline, top center) — only after a step is started ── */}
       {docOpen && (
-        <div className="relative z-30 shrink-0 px-6 pt-2 pb-2 animate-fade-scale-in">
+        <div className="relative z-30 shrink-0 px-6 pt-4 pb-4 animate-fade-scale-in">
           <FlowChart completed={completed} activeStep={activeStep} onSelect={openStep} hoverDescription />
         </div>
       )}
@@ -524,16 +642,20 @@ export default function NewPosition() {
       {/* ── Split area: chat | document ── */}
       <div className="relative z-10 flex-1 min-h-0 flex">
         {/* Chat column */}
-        <div className={`flex flex-col min-h-0 ${docOpen ? 'w-1/2' : 'flex-1'}`}>
-          <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className={`relative flex flex-col min-h-0 ${docOpen ? 'w-1/2' : 'flex-1'}`}>
+          <div ref={scrollRef} className={`flex-1 min-h-0 overflow-y-auto chat-scroll ${docOpen ? 'sophia-chat-fade' : ''}`}>
             {showEmpty ? (
               <div className="h-full flex flex-col items-center justify-center px-4 text-center animate-fade-scale-in">
                 <WandelBadge className="mb-4" />
                 <h2 className="text-xl font-semibold text-white">Create a new position</h2>
+                <p className="mt-2 text-sm text-slate-300 max-w-2xl">
+                  Tell Sophia about the role and she'll build it out with you, step by step.
+                </p>
 
-                {/* Flow chart preview */}
+                {/* Flow chart preview — descriptions on hover, but not clickable (only the
+                    timeline at the top of the page navigates between steps). */}
                 <div className="w-full max-w-6xl mt-6">
-                  <FlowChart completed={completed} activeStep={activeStep} onSelect={openStep} inlineDescription noGlow />
+                  <FlowChart completed={completed} activeStep={activeStep} onSelect={openStep} hoverDescription clickable={false} />
                 </div>
 
                 <button
@@ -541,6 +663,7 @@ export default function NewPosition() {
                   style={{ background: CARD_GRADIENT }}
                   className={`mt-8 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-gray-200 shadow-sm text-gray-800 text-sm font-medium ${CHATBOT_CARD_HOVER}`}
                 >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 5v14m-7-7h14" /></svg>
                   Start with Position
                 </button>
               </div>
@@ -569,103 +692,55 @@ export default function NewPosition() {
                 </div>
               </div>
             ) : (
-              <div className={`mx-auto px-4 py-6 flex flex-col gap-4 ${docOpen ? 'max-w-full' : 'max-w-3xl'}`}>
+              <div className={`mx-auto px-8 pt-6 pb-32 flex flex-col gap-4 ${docOpen ? 'max-w-full' : 'max-w-3xl'}`}>
                 {messages.map((m) => (
-                  <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div
-                      className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap break-words ${
-                        m.role === 'user'
-                          ? 'bg-[#1e3a5f] text-white'
-                          : 'bg-white border border-gray-200 text-gray-800'
-                      }`}
-                    >
-                      {m.text}
-                    </div>
-                  </div>
+                  <ChatMessage key={m.id} role={m.role} text={displayText(m)} streaming={isStreaming(m.id)} />
                 ))}
-                <div ref={bottomRef} />
               </div>
             )}
           </div>
 
-          {/* Composer */}
-          <div className="shrink-0 px-4 pb-5 pt-2">
-            <div className={`mx-auto ${docOpen ? 'max-w-full' : 'max-w-3xl'}`}>
-              <div style={{ background: CARD_GRADIENT }} className={`rounded-2xl border border-gray-200 shadow-sm ${CHATBOT_COMPOSER_GLOW}`}>
-                <textarea
-                  ref={taRef}
-                  value={draft}
-                  onChange={(e) => { setDraft(e.target.value); autoGrow(); }}
-                  onKeyDown={onKeyDown}
-                  rows={1}
-                  placeholder={docOpen ? `Describe the ${STEPS[activeStep!].label.toLowerCase()}…` : 'Describe the new position…'}
-                  className="w-full resize-none bg-transparent px-4 pt-3.5 pb-2 text-sm text-gray-800 placeholder:text-gray-400 outline-none max-h-[200px]"
-                />
-
-                <div className="border-t border-gray-100" />
-
-                <div className="flex items-center justify-between px-2.5 py-2">
-                  <button
-                    type="button"
-                    title="Attach file"
-                    aria-label="Attach file"
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                    </svg>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={send}
-                    disabled={!draft.trim()}
-                    title="Send"
-                    aria-label="Send message"
-                    className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
-                      draft.trim()
-                        ? 'bg-[#1e3a5f] text-white hover:bg-[#27496d]'
-                        : 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                    }`}
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19V5m0 0l-6 6m6-6l6 6" />
-                    </svg>
-                  </button>
-                </div>
+          {/* Composer — floats over the chat while in conversation (messages scroll behind/
+              around it and fade out), a normal bottom block otherwise. */}
+          {docOpen ? (
+            <div className="absolute inset-x-0 bottom-0 px-4 pb-4 pt-2 pointer-events-none">
+              <div className="mx-auto max-w-full pointer-events-auto">
+                {composer}
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="shrink-0 px-4 pb-4 pt-2">
+              <div className="mx-auto max-w-3xl">
+                {composer}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Document panel — floating page (matches composer side/bottom margins) */}
         {docOpen && (
-          <div className="w-1/2 min-h-0 flex pt-4 pb-5 pr-4 pl-1 animate-panel-in">
+          <div className="w-1/2 min-h-0 flex pt-0 pb-4 pr-4 pl-1 animate-panel-in">
             <div
-              style={{ background: isPreview ? '#eff6ff' : '#ffffff' }}
-              className={`flex-1 flex flex-col min-h-0 rounded-2xl border shadow-sm overflow-hidden ${
-                isPreview ? 'border-blue-300' : 'border-gray-200'
-              }`}
+              style={{ background: '#ffffff' }}
+              className="flex-1 flex flex-col min-h-0 rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
             >
               {/* Doc header */}
-              <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-gray-300">
+              <div className="shrink-0 flex items-center justify-between pl-5 pr-3 py-3">
                 <div className="flex items-center gap-2 min-w-0">
                   {/* Numbered badge matching the sidebar's position numbers (the new position's number) */}
-                  <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" strokeWidth={1.6} />
                     <text x="12" y="16.2" textAnchor="middle" fontSize="11" fontWeight="700" fill="currentColor" stroke="none">{NEW_POSITION_NUMBER}</text>
                   </svg>
                   <div className="min-w-0">
-                    <span className="block text-sm font-semibold text-gray-800 truncate">{STEPS[activeStep!].docTitle}</span>
+                    <span className="block text-base font-semibold text-gray-800 truncate">Job Description</span>
                     {positionName && (
                       <span className="block text-[11px] text-gray-400 truncate">{positionName}</span>
                     )}
                   </div>
-                  {isPreview && (
-                    <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.1em] bg-blue-500/10 text-blue-600 border border-blue-300">
-                      Preview
-                    </span>
-                  )}
+                  <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.1em] border ${STEP_BADGES[activeStep!].cls}`}>
+                    {STEP_BADGES[activeStep!].label}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -685,7 +760,7 @@ export default function NewPosition() {
                     onClick={() => setActiveStep(null)}
                     title="Close panel"
                     aria-label="Close document panel"
-                    className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                    className="w-7 h-7 flex items-center justify-center rounded-md text-gray-600 hover:text-gray-900 hover:bg-black/10 transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -695,9 +770,9 @@ export default function NewPosition() {
               </div>
 
               {/* Doc body — Notion-style sections (left rule, bold heading, no box) */}
-              <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 flex flex-col gap-6">
+              <div className="flex-1 min-h-0 overflow-y-auto doc-scroll-fade px-6 py-5 flex flex-col gap-6">
                 {isPreview ? (
-                  <PositionPreview bodies={bodies} />
+                  <PositionPreview bodies={bodies} checked={checked} onToggle={toggleChecked} />
                 ) : STEPS[activeStep!].groups ? (
                   <div className="flex flex-col gap-7">
                     {STEPS[activeStep!].groups!.map((group, gi) => {
@@ -706,7 +781,7 @@ export default function NewPosition() {
                       return (
                         <section key={group.header}>
                           {/* Larger section header standing above its sub-blocks */}
-                          <h2 className="text-[17px] font-bold text-gray-900 mb-2.5">{group.header}</h2>
+                          <h2 className="text-[15px] font-bold text-gray-900 mb-2.5">{group.header}</h2>
                           <div className="flex flex-col gap-4">
                             {group.blocks.map((block, bi) => {
                               // Content is shared across grouped steps (canonical in bodies[0]),
@@ -741,13 +816,13 @@ export default function NewPosition() {
                                                 aria-checked={qChecked}
                                                 aria-label={`Mark “${qq}” done`}
                                                 onClick={() => toggleChecked(qq)}
-                                                className={`shrink-0 mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                                                className={`shrink-0 mt-0.5 w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
                                                   qChecked
                                                     ? 'bg-blue-100 border-blue-300 text-blue-600'
                                                     : 'bg-white border-gray-300 hover:border-gray-400 text-transparent'
                                                 }`}
                                               >
-                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                                               </button>
                                               <span>{qq}</span>
                                             </li>
@@ -774,13 +849,13 @@ export default function NewPosition() {
                                       aria-checked={isChecked}
                                       aria-label={`Mark “${block.heading}” done`}
                                       onClick={() => toggleChecked(block.heading)}
-                                      className={`shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                                      className={`shrink-0 w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
                                         isChecked
                                           ? 'bg-blue-100 border-blue-300 text-blue-600'
                                           : 'bg-white border-gray-300 hover:border-gray-400 text-transparent'
                                       }`}
                                     >
-                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
                                     </button>
                                     <h3 className={`text-sm font-semibold ${filled ? 'text-gray-800' : 'text-gray-400 italic'}`}>{block.heading}</h3>
                                   </div>
@@ -848,6 +923,17 @@ export default function NewPosition() {
           </div>
         )}
       </div>
+
+      {/* Celebration overlay — plays when the final (Preview) step is marked complete. */}
+      {celebrate && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0b1437]/85 backdrop-blur-sm animate-fade-scale-in">
+          <div className="animate-celebrate-pop">
+            <WandelBadge size={88} />
+          </div>
+          <p className="mt-6 text-lg font-semibold text-white">Position created</p>
+          <p className="mt-1 text-sm text-slate-300">Added to your client positions in the sidebar.</p>
+        </div>
+      )}
     </div>
   );
 }

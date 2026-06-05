@@ -123,6 +123,87 @@
   background: rgba(255, 255, 255, 0.35);
 }
 
+/* ── Sophia "thinking" mark: each logo stroke shortens then elongates back ── */
+
+/* Strokes are normalized via pathLength=1. A centered dash (dasharray 1 0 → 0.5 0.5 with
+   matching offset) shrinks each line toward its midpoint and grows it back — both ends move
+   symmetrically. Per-line animation-delay (set inline) staggers them for a "drawing" feel. */
+@keyframes sophiaDraw {
+  0%, 100% { stroke-dasharray: 1 0;     stroke-dashoffset: 0; }
+  50%      { stroke-dasharray: 0.5 0.5; stroke-dashoffset: -0.25; }
+}
+.sophia-draw-line {
+  animation: sophiaDraw 1.6s ease-in-out infinite;
+}
+
+/* Soft fade at the top and bottom of the chat scroll area so messages don't hit a hard
+   cut-off line — they fade out as they scroll under the flow chart (top) and behind the
+   floating composer (bottom). The bottom band roughly matches the composer's height. */
+.sophia-chat-fade {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 calc(100% - 120px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 calc(100% - 120px), transparent 100%);
+}
+
+/* Soft top fade for the chat below the comparison table — messages dissolve gently toward
+   the top instead of hitting a hard edge under the table. */
+.chat-top-fade {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 40px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 40px);
+}
+
+/* Brighter scrollbar for the dark chat column (the default is barely visible on the
+   near-black background). */
+.chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.5) transparent;
+}
+.chat-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.5);
+  border-radius: 9999px;
+}
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.7);
+}
+
+/* Soft fade (top & bottom) for the job-description page body, so content scrolls off
+   gently instead of hitting a hard edge. */
+.doc-scroll-fade {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+}
+
+/* Celebration pop for the Wandel logo when a position is created. */
+@keyframes celebratePop {
+  0%   { transform: scale(0.5);  opacity: 0; filter: drop-shadow(0 0 0 rgba(129,140,248,0)); }
+  55%  { transform: scale(1.12); opacity: 1; filter: drop-shadow(0 0 30px rgba(129,140,248,0.9)); }
+  100% { transform: scale(1);    opacity: 1; filter: drop-shadow(0 0 16px rgba(129,140,248,0.55)); }
+}
+.animate-celebrate-pop {
+  animation: celebratePop 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Block "generating" caret sitting at the tail of the streaming text. */
+.sophia-caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.9);
+  animation: sophiaCaretBlink 1s steps(1, end) infinite;
+}
+@keyframes sophiaCaretBlink {
+  0%, 49%   { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
 html {
   height: 100%;
   overflow: hidden;

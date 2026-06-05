@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mockPositions, mockCandidates } from '../mockData';
 import StatusBadge from '../components/StatusBadge';
+import { WaveBackground } from '../components/SophiaChrome';
 import { AnalysisView, seedInitialEvaluations, emptyEval } from './PositionDetail';
 import type { AnalysisOutcome, Position, PositionStatus } from '../types';
 
@@ -38,7 +39,10 @@ export default function PositionWorkspace() {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0b1437] overflow-hidden min-h-0">
+    <div className="relative isolate flex-1 flex flex-col bg-[#0b1437] overflow-hidden min-h-0">
+      {/* ── Background wave ── */}
+      <WaveBackground />
+
       {/* Header */}
       <div className="shrink-0 px-5 pt-4 flex flex-col gap-4">
         <div className="min-w-0">

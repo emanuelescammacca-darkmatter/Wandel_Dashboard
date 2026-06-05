@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CARD_GRADIENT } from '../theme';
-import { WandelBadge, CHATBOT_COMPOSER_GLOW } from '../components/SophiaChrome';
-import waveBg from '../assets/wave.png';
+import { WandelBadge, ChatMessage, WaveBackground, CHATBOT_CARD_HOVER, CHATBOT_COMPOSER_GLOW } from '../components/SophiaChrome';
+import { useTypewriter } from '../hooks/useTypewriter';
+import { mockPositions, mockCandidates } from '../mockData';
 
 interface Message {
   id: number;
@@ -14,9 +15,81 @@ interface Category {
   label: string;
   description: string;
   icon: ReactNode;
-  prompt?: string; // sent into the chat when picked
-  to?: string;     // navigates instead of chatting
+  prompt?: string;  // sent into the chat when picked
+  to?: string;      // navigates instead of chatting
+  compare?: boolean; // opens the "pick a case to compare" cards instead of chatting
 }
+
+// Briefcase glyph used for the case cards (matches the sidebar's Positions icon).
+const CASE_ICON = (
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+);
+
+// The current cases shown when "Compare candidates" is picked — the first open positions,
+// each with how many candidates are on it (matched by job title).
+const COMPARE_CASES = mockPositions.slice(0, 3).map((p) => ({
+  title: p.title,
+  count: mockCandidates.filter((c) => c.jobTitle === p.title).length,
+  prompt: `Compare the candidates for "${p.title}" and tell me who is the strongest fit.`,
+}));
+
+// Rows shown in the comparison table, split by the first-column toggle. Each set scrolls
+// within the table while the header row stays fixed.
+type Candidate = (typeof mockCandidates)[number];
+type CompareMode = 'job' | 'profile';
+const COMPARE_ROWS: Record<CompareMode, { label: string; get: (c: Candidate) => string }[]> = {
+  job: [
+    { label: '💼 Job title',      get: (c) => (c.jobTitle ? `🔧 ${c.jobTitle}` : '—') },
+    { label: '🗣️ German level',   get: (c) => (c.germanLevel ? `🗣️ ${c.germanLevel} · conversational & written ✅` : '—') },
+    { label: '🎓 Training',        get: (c) => (c.training ? `🎓 ${c.training} — completed` : '—') },
+    { label: '💶 Salary',          get: (c) => (c.salary ? `💶 €${c.salary} / month (gross), negotiable` : '—') },
+    { label: '📅 Earliest start',  get: (c) => (c.earliestStart ? `📅 Available from ${c.earliestStart} ⏳` : '—') },
+    { label: '📲 Source',          get: (c) => (c.source ? `📲 Applied via ${c.source}` : '—') },
+    { label: '📍 Location',        get: (c) => { const loc = [c.city, c.address].filter(Boolean).join(' · '); return loc ? `📍 ${loc}` : '—'; } },
+  ],
+  profile: [
+    { label: '🧑 Name',            get: (c) => { const n = `${c.firstName} ${c.lastName}`.trim(); return n ? `🧑 ${n}` : '—'; } },
+    { label: '📍 City',            get: (c) => (c.city ? `📍 ${c.city} 🇩🇪` : '—') },
+    { label: '🏠 Address',         get: (c) => (c.address ? `🏠 ${c.address}` : '—') },
+    { label: '✉️ Email',           get: (c) => (c.email ? `✉️ ${c.email}` : '—') },
+    { label: '📞 Phone',           get: (c) => (c.phoneNumber ? `📞 ${c.phoneNumber}` : '—') },
+    { label: '🗣️ German level',    get: (c) => (c.germanLevel ? `🗣️ ${c.germanLevel} · everyday fluency` : '—') },
+    { label: '📲 Source',          get: (c) => (c.source ? `📲 Reached us via ${c.source}` : '—') },
+  ],
+};
+
+// The selectable candidates for a case (matched by job title; padded/​capped for a tidy grid).
+function candidatePoolForCase(title: string): Candidate[] {
+  const matched = mockCandidates.filter((c) => c.jobTitle === title);
+  const pool = matched.length >= 2 ? matched : [...matched, ...mockCandidates.filter((c) => !matched.includes(c))];
+  return pool.slice(0, 6);
+}
+
+// A selectable candidate card (white card + corner checkbox) used both in the selection step
+// and in the table's add/remove popover.
+function CandidateCard({ c, selected, onToggle }: { c: Candidate; selected: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      style={{ background: CARD_GRADIENT }}
+      className={`relative flex flex-col items-start text-left gap-1.5 h-full rounded-xl border shadow-md px-5 py-4 ${selected ? 'border-indigo-400 ring-2 ring-indigo-300/60' : 'border-gray-200'} ${CHATBOT_CARD_HOVER}`}
+    >
+      <span className={`absolute top-3 right-3 w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selected ? 'bg-indigo-500 border-indigo-500 text-white' : 'bg-white border-gray-300 text-transparent'}`}>
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+      </span>
+      <span className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#1e3a5f]/10 text-[#1e3a5f] text-sm font-semibold">
+        {c.firstName[0]}{c.lastName[0]}
+      </span>
+      <span className="mt-1.5 text-[15px] font-semibold text-gray-800 pr-6">{c.firstName} {c.lastName}</span>
+      <span className="text-xs leading-snug text-gray-500">{c.city || c.germanLevel || c.jobTitle}</span>
+    </button>
+  );
+}
+
+// Static placeholder reply (no backend yet) — "generation" is simulated client-side.
+const ASSISTANT_REPLY =
+  "Sure — let me look into that for you. Tell me which position or candidate you'd like to focus on.";
 
 const CATEGORIES: Category[] = [
   {
@@ -28,9 +101,9 @@ const CATEGORIES: Category[] = [
     ),
   },
   {
-    label: 'Compare two candidates',
-    description: 'Weigh two candidates side by side for a role.',
-    prompt: 'Compare two candidates for a position and tell me who is the stronger fit.',
+    label: 'Compare candidates',
+    description: 'Weigh candidates side by side for a case.',
+    compare: true,
     icon: (
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM21 6a3 3 0 11-6 0 3 3 0 016 0zM6 11v9m12-9v9M3 20h6m6 0h6" /></svg>
     ),
@@ -49,14 +122,28 @@ export default function AskSophia() {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
+  const [comparing, setComparing] = useState(false); // showing the "pick a case to compare" cards
+  // The case being compared → drives the comparison table pinned at the top of the view.
+  const [comparison, setComparison] = useState<{ title: string; candidates: Candidate[] } | null>(null);
+  const [compareMode, setCompareMode] = useState<CompareMode>('job'); // first-column toggle
+  // Candidate-selection step: the case whose candidates are being chosen, and which are ticked.
+  const [selectCase, setSelectCase] = useState<{ title: string; candidates: Candidate[] } | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [addMenuOpen, setAddMenuOpen] = useState(false); // "add candidate" popover on the table
+
+  // Shared per-character "generating" reveal (same behaviour across all chat views).
+  const { revealed, streamingId, start, isStreaming, displayText } = useTypewriter();
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const idRef = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Follow the conversation to the bottom. During streaming only `revealed` changes (not
+  // `messages`), so include it; use instant scroll while streaming since smooth can't keep
+  // up with the per-character cadence.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    bottomRef.current?.scrollIntoView({ behavior: streamingId !== null ? 'auto' : 'smooth' });
+  }, [messages, revealed, streamingId]);
 
   const autoGrow = () => {
     const el = taRef.current;
@@ -73,15 +160,24 @@ export default function AskSophia() {
   };
 
   const pushExchange = (text: string) => {
+    // Compute ids OUTSIDE the updater so the updater stays pure — otherwise React
+    // StrictMode double-invokes it, the counter advances twice, and `assistantId`
+    // no longer matches the rendered message id (which silently disabled streaming).
+    const userId = idRef.current++;
+    const assistantId = idRef.current++;
     setMessages((prev) => [
       ...prev,
-      { id: idRef.current++, role: 'user', text },
-      {
-        id: idRef.current++,
-        role: 'assistant',
-        text: "Sure — let me look into that for you. Tell me which position or candidate you'd like to focus on.",
-      },
+      { id: userId, role: 'user', text },
+      { id: assistantId, role: 'assistant', text: ASSISTANT_REPLY },
     ]);
+    start(assistantId, ASSISTANT_REPLY);
+  };
+
+  // Sophia opens the conversation herself (no preceding user message).
+  const pushAssistant = (text: string) => {
+    const id = idRef.current++;
+    setMessages((prev) => [...prev, { id, role: 'assistant', text }]);
+    start(id, text);
   };
 
   const send = () => {
@@ -96,8 +192,44 @@ export default function AskSophia() {
       navigate(cat.to);
       return;
     }
+    if (cat.compare) {
+      setComparing(true);
+      return;
+    }
     pushExchange(cat.prompt ?? cat.label);
   };
+
+  // Picking a case moves to the candidate-selection step (cards with checkboxes).
+  const pickCase = (c: (typeof COMPARE_CASES)[number]) => {
+    setComparing(false);
+    setSelectCase({ title: c.title, candidates: candidatePoolForCase(c.title) });
+    setSelectedIds([]);
+  };
+
+  const toggleSelected = (id: string) =>
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  // Confirming the selection opens the comparison table with the chosen candidates.
+  const confirmCompare = () => {
+    if (!selectCase || selectedIds.length < 2) return;
+    const candidates = selectCase.candidates.filter((c) => selectedIds.includes(c.id));
+    const title = selectCase.title;
+    setComparison({ title, candidates });
+    setSelectCase(null);
+    setSelectedIds([]);
+    pushAssistant("Here's how the candidates compare. Any questions about them — or would you like my take on the strongest fit?");
+  };
+
+  const removeCandidate = (id: string) =>
+    setComparison((prev) => (prev ? { ...prev, candidates: prev.candidates.filter((c) => c.id !== id) } : prev));
+
+  // Toggle a candidate in/out of the comparison (used by the "add candidate" popover).
+  const toggleComparisonCandidate = (cand: Candidate) =>
+    setComparison((prev) => {
+      if (!prev) return prev;
+      const has = prev.candidates.some((c) => c.id === cand.id);
+      return { ...prev, candidates: has ? prev.candidates.filter((c) => c.id !== cand.id) : [...prev.candidates, cand] };
+    });
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -155,26 +287,208 @@ export default function AskSophia() {
   );
 
   return (
-    <div className="relative flex-1 flex flex-col overflow-hidden bg-[#0b1437]">
+    <div className="relative isolate flex-1 flex flex-col overflow-hidden bg-[#0b1437]">
       {/* ── Background wave ── */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-0 bg-no-repeat bg-bottom"
-        style={{
-          backgroundImage: `url(${waveBg})`,
-          backgroundSize: '100% auto',
-          height: '100%',
-          mixBlendMode: 'screen',
-        }}
-      />
+      <WaveBackground />
+
+      {/* ── Candidate comparison table (pinned at the top; capped to ~1/3 of the view) ── */}
+      {comparison && (() => {
+        // Shared column widths so the fixed header table and the scrolling body table align.
+        const cols = (
+          <colgroup>
+            <col style={{ width: '20%' }} />
+            {comparison.candidates.map((c) => (
+              <col key={c.id} style={{ width: `${80 / comparison.candidates.length}%` }} />
+            ))}
+          </colgroup>
+        );
+        return (
+          <div className="relative z-10 shrink-0 px-4 pt-4 pb-2">
+            <div className="relative mx-auto max-w-7xl rounded-xl border border-white/10 overflow-hidden">
+              {/* Add-candidate control at the far right of the title row */}
+              <button
+                type="button"
+                onClick={() => setAddMenuOpen(true)}
+                title="Add or remove candidates"
+                aria-label="Add or remove candidates"
+                className="absolute top-2.5 right-2.5 z-20 w-7 h-7 flex items-center justify-center rounded-md text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 5v14m-7-7h14" /></svg>
+              </button>
+
+              {/* Fixed title row (its own table, outside the scroll area) */}
+              <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
+                {cols}
+                <thead>
+                  <tr>
+                    <th className="bg-[#1b2447] text-left px-4 py-3 border-b border-white/15 align-middle">
+                      <div className="inline-flex rounded-lg border border-white/10 bg-white/5 p-0.5 text-xs font-medium">
+                        <button
+                          type="button"
+                          onClick={() => setCompareMode('job')}
+                          className={`px-2.5 py-1 rounded-md transition-colors ${compareMode === 'job' ? 'bg-white/15 text-white' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          Job Description
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCompareMode('profile')}
+                          className={`px-2.5 py-1 rounded-md transition-colors ${compareMode === 'profile' ? 'bg-white/15 text-white' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          Profile
+                        </button>
+                      </div>
+                    </th>
+                    {comparison.candidates.map((c, ci) => (
+                      <th key={c.id} className="bg-[#1b2447] text-left px-4 py-3 border-b border-white/15 align-middle">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-7 h-7 rounded-full bg-white/10 text-slate-200 flex items-center justify-center text-xs font-semibold shrink-0">
+                            {c.firstName[0]}{c.lastName[0]}
+                          </span>
+                          <span className="font-semibold text-white truncate">{c.firstName} {c.lastName}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeCandidate(c.id)}
+                            title="Remove candidate"
+                            aria-label={`Remove ${c.firstName} ${c.lastName}`}
+                            className={`shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors ${ci === comparison.candidates.length - 1 ? 'mr-7' : ''}`}
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+              </table>
+
+              {/* Scrollable body (separate table, same column widths) */}
+              <div className="max-h-[33vh] overflow-y-auto chat-scroll">
+                <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
+                  {cols}
+                  <tbody>
+                    {COMPARE_ROWS[compareMode].map((row) => (
+                      <tr key={row.label}>
+                        <td className="px-4 py-2 align-middle font-medium text-slate-400">{row.label}</td>
+                        {comparison.candidates.map((c) => (
+                          <td key={c.id} className="px-3 py-2 align-top">
+                            {/* Entry styled exactly like the category pills under the text box */}
+                            <span className="inline-block max-w-full rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-slate-200 break-words hover:border-indigo-400/70 hover:bg-white/10 hover:text-white transition-colors">
+                              {row.get(c)}
+                            </span>
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Add/remove candidates popover (opened by the + on the table) ── */}
+      {addMenuOpen && comparison && (
+        <div
+          className="absolute inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setAddMenuOpen(false)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[80vh] overflow-y-auto chat-scroll rounded-2xl border border-white/10 bg-[#16224a] shadow-2xl p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-base font-semibold text-white">Select candidates</span>
+              <button
+                type="button"
+                onClick={() => setAddMenuOpen(false)}
+                aria-label="Close"
+                className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 auto-rows-fr gap-4">
+              {candidatePoolForCase(comparison.title).map((c) => (
+                <CandidateCard
+                  key={c.id}
+                  c={c}
+                  selected={comparison.candidates.some((x) => x.id === c.id)}
+                  onToggle={() => toggleComparisonCandidate(c)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Conversation ── */}
-      <div className="relative z-10 flex-1 min-h-0 overflow-y-auto">
-        {!hasMessages ? (
+      <div className={`relative z-10 flex-1 min-h-0 overflow-y-auto ${hasMessages ? 'chat-top-fade' : ''}`}>
+        {!hasMessages && comparing ? (
+          <div className="h-full flex flex-col items-center justify-center px-6 text-center animate-fade-scale-in">
+            <WandelBadge className="mb-4" />
+            <h2 className="text-2xl font-semibold text-white">Compare candidates</h2>
+            <p className="mt-2 text-sm text-slate-300 max-w-xl">
+              Pick a case to compare its candidates side by side.
+            </p>
+
+            {/* Case cards — same white-card style as the new-position setup cards */}
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 auto-rows-fr gap-4 w-full max-w-2xl">
+              {COMPARE_CASES.map((c) => (
+                <button
+                  key={c.title}
+                  onClick={() => pickCase(c)}
+                  style={{ background: CARD_GRADIENT }}
+                  className={`flex flex-col items-start text-left gap-1.5 h-full rounded-xl border border-gray-200 shadow-md px-5 py-4 ${CHATBOT_CARD_HOVER}`}
+                >
+                  <span className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#1e3a5f]/10 text-[#1e3a5f] [&_svg]:w-6 [&_svg]:h-6">
+                    {CASE_ICON}
+                  </span>
+                  <span className="mt-1.5 text-[15px] font-semibold text-gray-800">{c.title}</span>
+                  <span className="text-xs leading-snug text-gray-500">
+                    {c.count} {c.count === 1 ? 'candidate' : 'candidates'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : !hasMessages && selectCase ? (
+          <div className="h-full flex flex-col items-center justify-center px-6 text-center animate-fade-scale-in">
+            <WandelBadge className="mb-4" />
+            <h2 className="text-2xl font-semibold text-white">Select candidates</h2>
+            <p className="mt-2 text-sm text-slate-300 max-w-xl">
+              Choose the candidates to compare for “{selectCase.title}”.
+            </p>
+
+            {/* Candidate cards with a selection checkbox */}
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 auto-rows-fr gap-4 w-full max-w-3xl">
+              {selectCase.candidates.map((c) => (
+                <CandidateCard key={c.id} c={c} selected={selectedIds.includes(c.id)} onToggle={() => toggleSelected(c.id)} />
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={confirmCompare}
+              disabled={selectedIds.length < 2}
+              style={{ background: CARD_GRADIENT }}
+              className={`mt-8 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-gray-200 shadow-sm text-gray-800 text-sm font-medium ${
+                selectedIds.length >= 2 ? CHATBOT_CARD_HOVER : 'opacity-50 cursor-not-allowed'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM21 6a3 3 0 11-6 0 3 3 0 016 0zM6 11v9m12-9v9M3 20h6m6 0h6" /></svg>
+              Compare{selectedIds.length ? ` (${selectedIds.length})` : ''}
+            </button>
+          </div>
+        ) : !hasMessages ? (
           <div className="h-full flex flex-col items-center justify-center px-6 text-center animate-fade-scale-in">
             {/* Wandel logo badge */}
             <WandelBadge className="mb-4" />
             <h2 className="text-2xl font-semibold text-white">How can Sophia help?</h2>
+            <p className="mt-2 text-sm text-slate-300 max-w-xl">
+              Everything about your candidates is now searchable — just ask.
+            </p>
 
             {/* Centred chat window */}
             <div className="mt-6 w-full max-w-2xl">
@@ -198,25 +512,16 @@ export default function AskSophia() {
         ) : (
           <div className="mx-auto max-w-3xl px-4 py-6 flex flex-col gap-4">
             {messages.map((m) => (
-              <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap break-words ${
-                    m.role === 'user'
-                      ? 'bg-[#1e3a5f] text-white'
-                      : 'bg-white border border-gray-200 text-gray-800'
-                  }`}
-                >
-                  {m.text}
-                </div>
-              </div>
+              <ChatMessage key={m.id} role={m.role} text={displayText(m)} streaming={isStreaming(m.id)} />
             ))}
             <div ref={bottomRef} />
           </div>
         )}
       </div>
 
-      {/* ── Composer (only while in a conversation; otherwise it's centred above) ── */}
-      {hasMessages && (
+      {/* ── Composer: pinned to the bottom while in a conversation or picking a case to
+          compare; otherwise it's centred in the empty state above. ── */}
+      {(hasMessages || comparing || selectCase) && (
         <div className="relative z-10 shrink-0 px-4 pb-5 pt-2">
           <div className="mx-auto max-w-3xl">
             {composer}
