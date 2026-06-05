@@ -151,6 +151,14 @@
   mask-image: linear-gradient(to bottom, transparent 0, #000 40px);
 }
 
+/* Horizontal edge fade for the candidate card carousel — cards dissolve gradually at the
+   left/right edges instead of being hard-cut. Pair with matching horizontal padding so the
+   first/last cards sit just past the fade band when not scrolled. */
+.x-fade {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+}
+
 /* Brighter scrollbar for the dark chat column (the default is barely visible on the
    near-black background). */
 .chat-scroll {
@@ -159,6 +167,7 @@
 }
 .chat-scroll::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 .chat-scroll::-webkit-scrollbar-track {
   background: transparent;

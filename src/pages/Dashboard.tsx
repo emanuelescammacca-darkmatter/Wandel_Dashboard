@@ -179,7 +179,7 @@ function resolveFunnel(funnel: FocusFunnelStage[], weekIndex: number): FocusStag
    ('partial'), data-driven from Sophia answers vs. the job requirements. */
 type MatchStatus = 'yes' | 'partial';
 type MatchCriterion = { label: string; value?: string; status: MatchStatus };
-type Cand = {
+export type Cand = {
   id: string;
   name: string; position: string;
   location: string; distance: string;
@@ -456,18 +456,24 @@ function BriefcaseIcon() {
   );
 }
 
-function CandidateCard({ c }: { c: Cand }) {
+export function CandidateCard({ c, selectable = false, selected = false, onToggle }: { c: Cand; selectable?: boolean; selected?: boolean; onToggle?: () => void }) {
   const navigate = useNavigate();
   const go = () => navigate(`/clients/positions/candidate/${c.id}`);
   const tagCls = POSITION_TAG_CLS[c.position] ?? 'text-[#475569] bg-[#f1f5f9] border-[#e2e8f0]';
   return (
     <div
-      onClick={go}
-      className="rounded-2xl border border-[#e2e8f0] bg-white flex flex-col shrink-0 cursor-pointer transition-all duration-200 hover:-translate-y-[3px] hover:border-[#c7d2fe] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
+      onClick={selectable ? onToggle : go}
+      className={`relative rounded-2xl border bg-white flex flex-col shrink-0 cursor-pointer transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] ${selected ? 'border-indigo-400 ring-2 ring-indigo-300' : 'border-[#e2e8f0] hover:border-[#c7d2fe]'}`}
       style={{ width: 360, minWidth: 360, minHeight: 248, padding: '18px 20px', scrollSnapAlign: 'start' }}
     >
+      {/* selection checkbox (only in selectable mode) */}
+      {selectable && (
+        <span className={`absolute top-3.5 right-4 w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selected ? 'bg-indigo-500 border-indigo-500 text-white' : 'bg-white border-gray-300 text-transparent'}`}>
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+        </span>
+      )}
       {/* position tag */}
-      <div className="mb-3">
+      <div className={`mb-3 ${selectable ? 'pr-7' : ''}`}>
         <span className={`inline-flex items-center gap-1.5 max-w-full text-[11px] font-semibold rounded-full border px-2.5 py-1 ${tagCls}`}>
           <BriefcaseIcon /><span className="truncate">{c.position}</span>
         </span>
@@ -508,7 +514,7 @@ function CandidateCard({ c }: { c: Cand }) {
 }
 
 /* All candidates (top + extra), used to match a position to its candidates. */
-const ALL_CANDIDATES = [...CANDIDATES, ...CANDIDATES_MORE];
+export const ALL_CANDIDATES = [...CANDIDATES, ...CANDIDATES_MORE];
 
 /* ── Inner position content (no card chrome) — reused by the collapsed card
    and as the left column of the expanded full-width card. ── */

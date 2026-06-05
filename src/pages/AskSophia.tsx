@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { CARD_GRADIENT } from '../theme';
 import { WandelBadge, ChatMessage, WaveBackground, CHATBOT_CARD_HOVER, CHATBOT_COMPOSER_GLOW } from '../components/SophiaChrome';
 import { useTypewriter } from '../hooks/useTypewriter';
-import { mockPositions, mockCandidates } from '../mockData';
+import { ALL_CANDIDATES, CandidateCard, type Cand } from './Dashboard';
+
+// Initials avatar helper for the comparison-table header.
+const initials = (n: string) => n.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 
 interface Message {
   id: number;
@@ -25,66 +28,36 @@ const CASE_ICON = (
   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
 );
 
-// The current cases shown when "Compare candidates" is picked — the first open positions,
-// each with how many candidates are on it (matched by job title).
-const COMPARE_CASES = mockPositions.slice(0, 3).map((p) => ({
-  title: p.title,
-  count: mockCandidates.filter((c) => c.jobTitle === p.title).length,
-  prompt: `Compare the candidates for "${p.title}" and tell me who is the strongest fit.`,
+// The cases shown when "Compare candidates" is picked — the positions the Dashboard candidates
+// belong to, each with how many candidates are on it.
+const COMPARE_CASES = Array.from(new Set(ALL_CANDIDATES.map((c) => c.position))).map((title) => ({
+  title,
+  count: ALL_CANDIDATES.filter((c) => c.position === title).length,
 }));
 
-// Rows shown in the comparison table, split by the first-column toggle. Each set scrolls
-// within the table while the header row stays fixed.
-type Candidate = (typeof mockCandidates)[number];
+// Rows shown in the comparison table, split by the first-column toggle.
 type CompareMode = 'job' | 'profile';
-const COMPARE_ROWS: Record<CompareMode, { label: string; get: (c: Candidate) => string }[]> = {
+const yesCriteria = (c: Cand) => c.criteria.filter((cr) => cr.status === 'yes').map((cr) => cr.label).join(' · ');
+const partialCriteria = (c: Cand) => c.criteria.filter((cr) => cr.status === 'partial').map((cr) => cr.label).join(' · ');
+const COMPARE_ROWS: Record<CompareMode, { label: string; get: (c: Cand) => string }[]> = {
   job: [
-    { label: '💼 Job title',      get: (c) => (c.jobTitle ? `🔧 ${c.jobTitle}` : '—') },
-    { label: '🗣️ German level',   get: (c) => (c.germanLevel ? `🗣️ ${c.germanLevel} · conversational & written ✅` : '—') },
-    { label: '🎓 Training',        get: (c) => (c.training ? `🎓 ${c.training} — completed` : '—') },
-    { label: '💶 Salary',          get: (c) => (c.salary ? `💶 €${c.salary} / month (gross), negotiable` : '—') },
-    { label: '📅 Earliest start',  get: (c) => (c.earliestStart ? `📅 Available from ${c.earliestStart} ⏳` : '—') },
-    { label: '📲 Source',          get: (c) => (c.source ? `📲 Applied via ${c.source}` : '—') },
-    { label: '📍 Location',        get: (c) => { const loc = [c.city, c.address].filter(Boolean).join(' · '); return loc ? `📍 ${loc}` : '—'; } },
+    { label: '💼 Position',    get: (c) => `🔧 ${c.position}` },
+    { label: '🎯 Fit',         get: (c) => `🎯 ${c.fitPct}% match` },
+    { label: '✅ Strengths',   get: (c) => (yesCriteria(c) ? `✅ ${yesCriteria(c)}` : '—') },
+    { label: '⚠️ Watch-outs',  get: (c) => (partialCriteria(c) ? `⚠️ ${partialCriteria(c)}` : '—') },
+    { label: '📅 Available',   get: (c) => `📅 Available ${c.available}` },
   ],
   profile: [
-    { label: '🧑 Name',            get: (c) => { const n = `${c.firstName} ${c.lastName}`.trim(); return n ? `🧑 ${n}` : '—'; } },
-    { label: '📍 City',            get: (c) => (c.city ? `📍 ${c.city} 🇩🇪` : '—') },
-    { label: '🏠 Address',         get: (c) => (c.address ? `🏠 ${c.address}` : '—') },
-    { label: '✉️ Email',           get: (c) => (c.email ? `✉️ ${c.email}` : '—') },
-    { label: '📞 Phone',           get: (c) => (c.phoneNumber ? `📞 ${c.phoneNumber}` : '—') },
-    { label: '🗣️ German level',    get: (c) => (c.germanLevel ? `🗣️ ${c.germanLevel} · everyday fluency` : '—') },
-    { label: '📲 Source',          get: (c) => (c.source ? `📲 Reached us via ${c.source}` : '—') },
+    { label: '📍 Location',    get: (c) => `📍 ${c.location} · ${c.distance}` },
+    { label: '💼 Position',    get: (c) => `🔧 ${c.position}` },
+    { label: '🎯 Fit',         get: (c) => `🎯 ${c.fitPct}% match` },
+    { label: '📅 Available',   get: (c) => `📅 Available ${c.available}` },
   ],
 };
 
-// The selectable candidates for a case (matched by job title; padded/​capped for a tidy grid).
-function candidatePoolForCase(title: string): Candidate[] {
-  const matched = mockCandidates.filter((c) => c.jobTitle === title);
-  const pool = matched.length >= 2 ? matched : [...matched, ...mockCandidates.filter((c) => !matched.includes(c))];
-  return pool.slice(0, 6);
-}
-
-// A selectable candidate card (white card + corner checkbox) used both in the selection step
-// and in the table's add/remove popover.
-function CandidateCard({ c, selected, onToggle }: { c: Candidate; selected: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      style={{ background: CARD_GRADIENT }}
-      className={`relative flex flex-col items-start text-left gap-1.5 h-full rounded-xl border shadow-md px-5 py-4 ${selected ? 'border-indigo-400 ring-2 ring-indigo-300/60' : 'border-gray-200'} ${CHATBOT_CARD_HOVER}`}
-    >
-      <span className={`absolute top-3 right-3 w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${selected ? 'bg-indigo-500 border-indigo-500 text-white' : 'bg-white border-gray-300 text-transparent'}`}>
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-      </span>
-      <span className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#1e3a5f]/10 text-[#1e3a5f] text-sm font-semibold">
-        {c.firstName[0]}{c.lastName[0]}
-      </span>
-      <span className="mt-1.5 text-[15px] font-semibold text-gray-800 pr-6">{c.firstName} {c.lastName}</span>
-      <span className="text-xs leading-snug text-gray-500">{c.city || c.germanLevel || c.jobTitle}</span>
-    </button>
-  );
+// The selectable candidates for a case — the Dashboard candidates on that position.
+function candidatePoolForCase(title: string): Cand[] {
+  return ALL_CANDIDATES.filter((c) => c.position === title);
 }
 
 // Static placeholder reply (no backend yet) — "generation" is simulated client-side.
@@ -124,10 +97,10 @@ export default function AskSophia() {
   const [draft, setDraft] = useState('');
   const [comparing, setComparing] = useState(false); // showing the "pick a case to compare" cards
   // The case being compared → drives the comparison table pinned at the top of the view.
-  const [comparison, setComparison] = useState<{ title: string; candidates: Candidate[] } | null>(null);
+  const [comparison, setComparison] = useState<{ title: string; candidates: Cand[] } | null>(null);
   const [compareMode, setCompareMode] = useState<CompareMode>('job'); // first-column toggle
   // Candidate-selection step: the case whose candidates are being chosen, and which are ticked.
-  const [selectCase, setSelectCase] = useState<{ title: string; candidates: Candidate[] } | null>(null);
+  const [selectCase, setSelectCase] = useState<{ title: string; candidates: Cand[] } | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [addMenuOpen, setAddMenuOpen] = useState(false); // "add candidate" popover on the table
 
@@ -224,7 +197,7 @@ export default function AskSophia() {
     setComparison((prev) => (prev ? { ...prev, candidates: prev.candidates.filter((c) => c.id !== id) } : prev));
 
   // Toggle a candidate in/out of the comparison (used by the "add candidate" popover).
-  const toggleComparisonCandidate = (cand: Candidate) =>
+  const toggleComparisonCandidate = (cand: Cand) =>
     setComparison((prev) => {
       if (!prev) return prev;
       const has = prev.candidates.some((c) => c.id === cand.id);
@@ -343,14 +316,14 @@ export default function AskSophia() {
                       <th key={c.id} className="bg-[#1b2447] text-left px-4 py-3 border-b border-white/15 align-middle">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="w-7 h-7 rounded-full bg-white/10 text-slate-200 flex items-center justify-center text-xs font-semibold shrink-0">
-                            {c.firstName[0]}{c.lastName[0]}
+                            {initials(c.name)}
                           </span>
-                          <span className="font-semibold text-white truncate">{c.firstName} {c.lastName}</span>
+                          <span className="font-semibold text-white truncate">{c.name}</span>
                           <button
                             type="button"
                             onClick={() => removeCandidate(c.id)}
                             title="Remove candidate"
-                            aria-label={`Remove ${c.firstName} ${c.lastName}`}
+                            aria-label={`Remove ${c.name}`}
                             className={`shrink-0 w-5 h-5 flex items-center justify-center rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors ${ci === comparison.candidates.length - 1 ? 'mr-7' : ''}`}
                           >
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -395,7 +368,7 @@ export default function AskSophia() {
           onClick={() => setAddMenuOpen(false)}
         >
           <div
-            className="w-full max-w-2xl max-h-[80vh] overflow-y-auto chat-scroll rounded-2xl border border-white/10 bg-[#16224a] shadow-2xl p-5"
+            className="w-full max-w-7xl max-h-[80vh] overflow-y-auto chat-scroll rounded-2xl border border-white/10 bg-[#16224a] shadow-2xl p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -409,11 +382,12 @@ export default function AskSophia() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 auto-rows-fr gap-4">
+            <div className="flex gap-4 overflow-x-auto snap-x px-6 py-4 chat-scroll x-fade">
               {candidatePoolForCase(comparison.title).map((c) => (
                 <CandidateCard
                   key={c.id}
                   c={c}
+                  selectable
                   selected={comparison.candidates.some((x) => x.id === c.id)}
                   onToggle={() => toggleComparisonCandidate(c)}
                 />
@@ -462,9 +436,9 @@ export default function AskSophia() {
             </p>
 
             {/* Candidate cards with a selection checkbox */}
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 auto-rows-fr gap-4 w-full max-w-3xl">
+            <div className="mt-6 flex gap-4 overflow-x-auto snap-x w-full px-6 py-4 chat-scroll x-fade">
               {selectCase.candidates.map((c) => (
-                <CandidateCard key={c.id} c={c} selected={selectedIds.includes(c.id)} onToggle={() => toggleSelected(c.id)} />
+                <CandidateCard key={c.id} c={c} selectable selected={selectedIds.includes(c.id)} onToggle={() => toggleSelected(c.id)} />
               ))}
             </div>
 
