@@ -197,15 +197,20 @@ export default function Sidebar() {
         {/* Toggle button — always at this row's height */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="w-8 h-8 flex items-center justify-center rounded-md text-white/45 hover:text-white/80 hover:bg-white/6 transition-colors shrink-0"
+          title={collapsed ? undefined : 'Collapse sidebar'}
+          className="relative group/toggle w-8 h-8 flex items-center justify-center rounded-md text-white/45 hover:text-white/80 hover:bg-white/6 transition-colors shrink-0"
         >
           <span className="w-4.5 h-4.5">{collapsed ? PanelOpen : PanelClose}</span>
+          {collapsed && (
+            <span className="absolute left-full top-1/2 -translate-y-1/2 ml-3 bg-neutral-600/75 text-white/90 text-xs font-medium px-2.5 py-1.5 rounded-md whitespace-nowrap pointer-events-none select-none z-50 opacity-0 group-hover/toggle:opacity-100 transition-opacity duration-150">
+              Open
+            </span>
+          )}
         </button>
       </div>
 
       {/* ── Nav ── */}
-      <nav ref={navRef} className={`flex-1 min-h-0 pb-3 sidebar-scroll ${collapsed ? 'overflow-visible px-1' : 'overflow-y-auto px-2'}`}>
+      <nav ref={navRef} className={`flex-1 min-h-0 pb-3 sidebar-scroll ${collapsed ? 'overflow-visible px-1' : 'overflow-y-auto px-2 nav-top-fade'}`}>
         {NAV_SECTIONS.map((section) => {
           // Append user-created positions to the client-positions section as they're added.
           const items: NavItem[] =
@@ -245,7 +250,7 @@ export default function Sidebar() {
                           `flex items-center rounded-md transition-colors ${
                             collapsed
                               ? 'justify-center w-8 h-8 mx-auto'
-                              : 'gap-2.5 px-2.5 py-1.75'
+                              : 'gap-2.5 px-2.5 h-8'
                           } ${hasChildren ? 'pr-7' : ''} ${
                             isActive
                               ? 'bg-white/10 text-white'
@@ -295,13 +300,13 @@ export default function Sidebar() {
 
                     {/* Sub-pages */}
                     {hasChildren && isOpen && (
-                      <div className="mt-px mb-1 flex flex-col gap-px pl-6">
+                      <div className="mt-px flex flex-col gap-px pl-6">
                         {item.children!.map((child) => (
                           <NavLink
                             key={child.path}
                             to={child.path}
                             className={({ isActive }) =>
-                              `flex items-center rounded-md px-2.5 py-1.75 text-[13px] truncate transition-colors ${
+                              `flex items-center rounded-md px-2.5 h-8 text-[13px] truncate transition-colors ${
                                 isActive
                                   ? 'bg-white/10 text-white'
                                   : 'text-white/55 hover:text-white/90 hover:bg-white/6'

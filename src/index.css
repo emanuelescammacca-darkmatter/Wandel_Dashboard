@@ -151,6 +151,13 @@
   mask-image: linear-gradient(to bottom, transparent 0, #000 40px);
 }
 
+/* Soft top fade for the sidebar nav — content dissolves under the logo/title header instead
+   of being hard-cut when scrolled. */
+.nav-top-fade {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 28px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 28px);
+}
+
 /* Horizontal edge fade for the candidate card carousel — cards dissolve gradually at the
    left/right edges instead of being hard-cut. Pair with matching horizontal padding so the
    first/last cards sit just past the fade band when not scrolled. */
