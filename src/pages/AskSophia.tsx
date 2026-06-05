@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CARD_GRADIENT } from '../theme';
-import { WandelBadge, CHATBOT_CARD_HOVER, CHATBOT_COMPOSER_GLOW } from '../components/SophiaChrome';
+import { WandelBadge, CHATBOT_COMPOSER_GLOW } from '../components/SophiaChrome';
+import waveBg from '../assets/wave.png';
 
 interface Message {
   id: number;
@@ -107,32 +108,89 @@ export default function AskSophia() {
 
   const hasMessages = messages.length > 0;
 
+  const composer = (
+    <div style={{ background: CARD_GRADIENT }} className={`rounded-2xl border border-gray-200 shadow-sm ${CHATBOT_COMPOSER_GLOW}`}>
+      <textarea
+        ref={taRef}
+        value={draft}
+        onChange={(e) => { setDraft(e.target.value); autoGrow(); }}
+        onKeyDown={onKeyDown}
+        rows={1}
+        placeholder="Ask Sophia anything…"
+        className="w-full resize-none bg-transparent px-4 pt-3.5 pb-2 text-sm text-gray-800 placeholder:text-gray-400 outline-none max-h-[200px]"
+      />
+
+      <div className="border-t border-gray-100" />
+
+      <div className="flex items-center justify-between px-2.5 py-2">
+        <button
+          type="button"
+          title="Attach file"
+          aria-label="Attach file"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          onClick={send}
+          disabled={!draft.trim()}
+          title="Send"
+          aria-label="Send message"
+          className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+            draft.trim()
+              ? 'bg-[#1e3a5f] text-white hover:bg-[#27496d]'
+              : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19V5m0 0l-6 6m6-6l6 6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="relative flex-1 flex flex-col overflow-hidden bg-[#0b1437]">
+      {/* ── Background wave ── */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-0 bg-no-repeat bg-bottom"
+        style={{
+          backgroundImage: `url(${waveBg})`,
+          backgroundSize: '100% auto',
+          height: '100%',
+          mixBlendMode: 'screen',
+        }}
+      />
+
       {/* ── Conversation ── */}
       <div className="relative z-10 flex-1 min-h-0 overflow-y-auto">
         {!hasMessages ? (
           <div className="h-full flex flex-col items-center justify-center px-6 text-center animate-fade-scale-in">
             {/* Wandel logo badge */}
             <WandelBadge className="mb-4" />
-            <h2 className="text-xl font-semibold text-white">How can Sophia help?</h2>
-            <p className="mt-1.5 text-sm text-slate-300 max-w-md">
-              Pick a category to get started, or ask Sophia anything below.
-            </p>
+            <h2 className="text-2xl font-semibold text-white">How can Sophia help?</h2>
 
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 auto-rows-fr gap-4 w-full max-w-2xl">
+            {/* Centred chat window */}
+            <div className="mt-6 w-full max-w-2xl">
+              {composer}
+            </div>
+
+            {/* Title-only category pills */}
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat.label}
                   onClick={() => pickCategory(cat)}
-                  style={{ background: CARD_GRADIENT }}
-                  className={`flex flex-col items-start text-left gap-1.5 h-full rounded-xl border border-gray-200 shadow-md px-5 py-4 ${CHATBOT_CARD_HOVER}`}
+                  className={`inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-sm text-slate-200 [&_svg]:w-4 [&_svg]:h-4 hover:border-indigo-400/70 hover:bg-white/10 hover:text-white transition-colors`}
                 >
-                  <span className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#1e3a5f]/10 text-[#1e3a5f] [&_svg]:w-6 [&_svg]:h-6">
-                    {cat.icon}
-                  </span>
-                  <span className="mt-1.5 text-[15px] font-semibold text-gray-800">{cat.label}</span>
-                  <span className="text-xs leading-snug text-gray-500">{cat.description}</span>
+                  <span className="text-slate-300">{cat.icon}</span>
+                  {cat.label}
                 </button>
               ))}
             </div>
@@ -157,54 +215,14 @@ export default function AskSophia() {
         )}
       </div>
 
-      {/* ── Composer ── */}
-      <div className="relative z-10 shrink-0 px-4 pb-5 pt-2">
-        <div className="mx-auto max-w-3xl">
-          <div style={{ background: CARD_GRADIENT }} className={`rounded-2xl border border-gray-200 shadow-sm ${CHATBOT_COMPOSER_GLOW}`}>
-            <textarea
-              ref={taRef}
-              value={draft}
-              onChange={(e) => { setDraft(e.target.value); autoGrow(); }}
-              onKeyDown={onKeyDown}
-              rows={1}
-              placeholder="Ask Sophia anything…"
-              className="w-full resize-none bg-transparent px-4 pt-3.5 pb-2 text-sm text-gray-800 placeholder:text-gray-400 outline-none max-h-[200px]"
-            />
-
-            <div className="border-t border-gray-100" />
-
-            <div className="flex items-center justify-between px-2.5 py-2">
-              <button
-                type="button"
-                title="Attach file"
-                aria-label="Attach file"
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                </svg>
-              </button>
-
-              <button
-                type="button"
-                onClick={send}
-                disabled={!draft.trim()}
-                title="Send"
-                aria-label="Send message"
-                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
-                  draft.trim()
-                    ? 'bg-[#1e3a5f] text-white hover:bg-[#27496d]'
-                    : 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                }`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19V5m0 0l-6 6m6-6l6 6" />
-                </svg>
-              </button>
-            </div>
+      {/* ── Composer (only while in a conversation; otherwise it's centred above) ── */}
+      {hasMessages && (
+        <div className="relative z-10 shrink-0 px-4 pb-5 pt-2">
+          <div className="mx-auto max-w-3xl">
+            {composer}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
