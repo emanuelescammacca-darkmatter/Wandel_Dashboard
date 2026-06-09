@@ -464,15 +464,15 @@ function BriefcaseIcon() {
   );
 }
 
-export function CandidateCard({ c, selectable = false, selected = false, onToggle }: { c: Cand; selectable?: boolean; selected?: boolean; onToggle?: () => void }) {
+export function CandidateCard({ c, selectable = false, selected = false, onToggle, fullWidth = false }: { c: Cand; selectable?: boolean; selected?: boolean; onToggle?: () => void; fullWidth?: boolean }) {
   const navigate = useNavigate();
   const go = () => navigate(`/clients/positions/candidate/${c.id}`);
   const tagCls = POSITION_TAG_CLS[c.position] ?? 'text-[#475569] bg-[#f1f5f9] border-[#e2e8f0]';
   return (
     <div
       onClick={selectable ? onToggle : go}
-      className={`relative rounded-2xl border bg-white flex flex-col shrink-0 cursor-pointer transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] ${selected ? 'border-indigo-400 ring-2 ring-indigo-300' : 'border-[#e2e8f0] hover:border-[#c7d2fe]'}`}
-      style={{ width: 'clamp(300px, 25vw, 380px)', minHeight: 248, padding: '18px 20px', scrollSnapAlign: 'start' }}
+      className={`relative rounded-2xl border bg-white flex flex-col cursor-pointer transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] ${fullWidth ? 'w-full' : 'shrink-0'} ${selected ? 'border-indigo-400 ring-2 ring-indigo-300' : 'border-[#e2e8f0] hover:border-[#c7d2fe]'}`}
+      style={{ width: fullWidth ? '100%' : 'clamp(300px, 25vw, 380px)', minHeight: 248, padding: '18px 20px', scrollSnapAlign: 'start' }}
     >
       {/* selection checkbox (only in selectable mode) */}
       {selectable && (
@@ -1537,9 +1537,9 @@ function DropOffCard({ d }: { d: DropOffData }) {
         </div>
 
         {/* opportunity framing */}
-        <div className="rounded-lg border border-[#4f46e5]/30 bg-[#4f46e5]/10 p-4 flex flex-col justify-center">
-          <p className="text-[10px] uppercase tracking-[0.14em] font-semibold text-[#a5b4fc]">Opportunity</p>
-          <p className="text-[13px] text-[#cbd5e1] leading-relaxed mt-2">
+        <div className="rounded-lg border border-[#4f46e5]/30 bg-[#4f46e5]/10 p-5 flex flex-col justify-center">
+          <p className="text-[11px] uppercase tracking-[0.14em] font-semibold text-[#a5b4fc]">Opportunity</p>
+          <p className="text-[16px] text-[#e2e8f0] leading-relaxed mt-2.5">
             <span className="text-[#34d399] font-semibold">{o.count}</span> {o.before}
             {o.money && <> <span className="text-white font-semibold">{o.money}</span> {o.after}</>}
           </p>
@@ -1611,6 +1611,165 @@ function LocationsCard({ pts, total }: { pts: { city: string; count: number; lat
       </div>
 
       <p className="text-[10px] text-[#475569] mt-2 text-right">© OpenStreetMap · CARTO</p>
+    </div>
+  );
+}
+
+/* ── Candidate pipeline board (Kanban) ──────────────────────────────────────
+   An interactive drag-and-drop board for hands-on candidate management. Cards
+   move between stages; each column shows its WIP count and flags candidates
+   that have stalled. Replaces the static "Top Candidates" strip. */
+type KStage = 'rejected' | 'new' | 'shortlist' | 'interview' | 'offer' | 'hired';
+const KSTAGES: { key: KStage; label: string; hint: string; accent: string; terminal?: boolean }[] = [
+  { key: 'rejected', label: 'Rejected', hint: 'Not moving forward', accent: '#ef4444', terminal: true },
+  { key: 'new', label: 'New', hint: 'Fresh matches', accent: '#3b82f6' },
+  { key: 'shortlist', label: 'Shortlisted', hint: 'Marked for review', accent: '#6366f1' },
+  { key: 'interview', label: 'Interviewing', hint: 'Scheduled or pending', accent: '#a855f7' },
+  { key: 'offer', label: 'Offer Extended', hint: 'Awaiting decision', accent: '#f59e0b' },
+  { key: 'hired', label: 'Hired', hint: 'Closed — won', accent: '#16a34a', terminal: true },
+];
+const STALL_DAYS = 5; // candidates idle this long in an active stage get nudged
+const COLUMN_W = 290;
+
+type BoardCand = Cand & { stage: KStage; daysInStage: number };
+const INITIAL_BOARD: BoardCand[] = [
+  { ...ALL_CANDIDATES.find(c => c.id === '6')!, stage: 'rejected', daysInStage: 3 },
+  { ...ALL_CANDIDATES.find(c => c.id === '5')!, stage: 'new', daysInStage: 2 },
+  { ...ALL_CANDIDATES.find(c => c.id === '3')!, stage: 'new', daysInStage: 4 },
+  { ...ALL_CANDIDATES.find(c => c.id === '4')!, stage: 'shortlist', daysInStage: 6 },
+  { ...ALL_CANDIDATES.find(c => c.id === '1')!, stage: 'interview', daysInStage: 2 },
+  { ...ALL_CANDIDATES.find(c => c.id === '8')!, stage: 'interview', daysInStage: 7 },
+  { ...ALL_CANDIDATES.find(c => c.id === '2')!, stage: 'offer', daysInStage: 1 },
+  { ...ALL_CANDIDATES.find(c => c.id === '7')!, stage: 'hired', daysInStage: 1 },
+];
+
+const isStageTerminal = (s: KStage) => KSTAGES.find(k => k.key === s)?.terminal ?? false;
+const isStalled = (c: BoardCand) => !isStageTerminal(c.stage) && c.daysInStage >= STALL_DAYS;
+
+function PipelineBoard({ positions }: { positions: string[] }) {
+  const [cards, setCards] = useState<BoardCand[]>(INITIAL_BOARD);
+  const [posFilter, setPosFilter] = useState<string>('all');
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overStage, setOverStage] = useState<KStage | null>(null);
+
+  const visible = posFilter === 'all' ? cards : cards.filter(c => c.position === posFilter);
+  const move = (id: string, stage: KStage) =>
+    setCards(cs => cs.map(c => (c.id === id && c.stage !== stage ? { ...c, stage, daysInStage: 0 } : c)));
+
+  const stalledCount = visible.filter(isStalled).length;
+  const filters = [{ key: 'all', label: 'All positions' }, ...positions.map(p => ({ key: p, label: p }))];
+
+  return (
+    <div className="bg-transparent">
+      {/* board controls: position filter + attention summary */}
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+        <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[#0b1330] border border-white/[0.08] flex-wrap">
+          {filters.map(f => (
+            <button
+              key={f.key}
+              onClick={() => setPosFilter(f.key)}
+              className={`text-[12px] font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                posFilter === f.key ? 'bg-[#4f46e5] text-white shadow-sm' : 'text-[#94a3b8] hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {f.key === 'all' ? f.label : f.label.split(' ')[0]}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-4 text-[12px]">
+          <span className="text-[#94a3b8] font-medium">{visible.length} candidates in pipeline</span>
+          {stalledCount > 0 && (
+            <span className="inline-flex items-center gap-1.5 font-semibold text-[#fbbf24]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b] animate-pulse" />{stalledCount} need a nudge
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* columns — horizontal scroll, fixed-width Trello-style lanes */}
+      <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
+        {KSTAGES.map(stage => {
+          const items = visible.filter(c => c.stage === stage.key);
+          const isOver = overStage === stage.key;
+          return (
+            <div
+              key={stage.key}
+              onDragOver={e => { e.preventDefault(); setOverStage(stage.key); }}
+              onDragLeave={() => setOverStage(s => (s === stage.key ? null : s))}
+              onDrop={() => { if (dragId) move(dragId, stage.key); setOverStage(null); setDragId(null); }}
+              className="flex-1 rounded-2xl border p-2.5 transition-all duration-150"
+              style={{
+                minWidth: COLUMN_W,
+                borderColor: isOver ? stage.accent : 'rgba(255,255,255,0.10)',
+                background: isOver
+                  ? `linear-gradient(180deg, ${stage.accent}33, rgba(11,19,48,0.65))`
+                  : `linear-gradient(180deg, ${stage.accent}1f, rgba(11,19,48,0.55) 42%)`,
+                boxShadow: isOver
+                  ? `0 10px 30px ${stage.accent}40, inset 0 1px 0 rgba(255,255,255,0.06)`
+                  : '0 4px 18px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.05)',
+              }}
+            >
+              {/* column header band — accent tinted */}
+              <div
+                className="rounded-xl px-3 py-2.5 mb-3 border"
+                style={{
+                  background: `linear-gradient(135deg, ${stage.accent}3a, ${stage.accent}12)`,
+                  borderColor: `${stage.accent}45`,
+                }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ background: stage.accent, boxShadow: `0 0 10px ${stage.accent}, 0 0 0 4px ${stage.accent}33` }}
+                  />
+                  <span className="text-[16px] font-bold text-white tracking-tight flex-1 truncate">{stage.label}</span>
+                  <span
+                    className="text-[12px] font-bold tabular-nums rounded-full px-2 py-0.5 min-w-[24px] text-center shrink-0"
+                    style={{ background: `${stage.accent}33`, color: '#fff' }}
+                  >
+                    {items.length}
+                  </span>
+                </div>
+                <p className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[#94a3b8] mt-1.5 pl-[20px]">{stage.hint}</p>
+              </div>
+
+              {/* drop area */}
+              <div className="flex flex-col gap-3 min-h-[160px]">
+                {items.map(c => {
+                  const stalled = isStalled(c);
+                  return (
+                    <div
+                      key={c.id}
+                      draggable
+                      onDragStart={e => { setDragId(c.id); e.dataTransfer.effectAllowed = 'move'; }}
+                      onDragEnd={() => { setDragId(null); setOverStage(null); }}
+                      className={`relative transition-opacity ${dragId === c.id ? 'opacity-40' : ''}`}
+                    >
+                      {stalled && (
+                        <span className="absolute -top-2 left-3 z-10 inline-flex items-center gap-1 text-[10px] font-semibold text-[#b45309] bg-[#fffbeb] border border-[#fde68a] rounded-full px-2 py-0.5 shadow-sm">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b] animate-pulse" />{c.daysInStage}d · nudge
+                        </span>
+                      )}
+                      <CandidateCard c={c} fullWidth />
+                    </div>
+                  );
+                })}
+                {items.length === 0 && (
+                  <div
+                    className="rounded-xl border border-dashed py-10 text-center text-[11px] font-medium transition-colors"
+                    style={{
+                      borderColor: isOver ? stage.accent : 'rgba(255,255,255,0.12)',
+                      color: isOver ? stage.accent : '#64748b',
+                    }}
+                  >
+                    {isOver ? 'Drop here' : 'No candidates'}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1828,12 +1987,10 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {/* B. Top Candidates — one long horizontally-scrollable chain of cards */}
+          {/* B. Candidate Pipeline — interactive drag-and-drop board */}
           <section className="mt-12">
-            <SectionLabel>Top Candidates</SectionLabel>
-            <div className={`${SCROLL_ROW} items-start -mx-2 px-2 pt-3 pb-4`} style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory' }}>
-              {[...CANDIDATES, ...CANDIDATES_MORE].map(c => <CandidateCard key={c.name} c={c} />)}
-            </div>
+            <SectionLabel>Candidate Pipeline</SectionLabel>
+            <PipelineBoard positions={POSITIONS.map(p => p.title)} />
           </section>
 
           {/* D. Outreach Funnel — flow-chart view of the same channels (Meta/Google → Wandel → Sophia/HR) */}
