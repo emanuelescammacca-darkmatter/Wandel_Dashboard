@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { mockPositions, mockCandidates } from '../mockData';
+import { mockPositions, mockCandidates } from '../data/mockData';
 import StatusBadge from '../components/StatusBadge';
 import { WaveBackground } from '../components/SophiaChrome';
-import { AnalysisView, seedInitialEvaluations, emptyEval } from './PositionDetail';
+import { AnalysisView, JobDescriptionView, seedInitialEvaluations, emptyEval } from './PositionDetail';
 import type { AnalysisOutcome, Position, PositionStatus } from '../types';
 
 type Tab = 'candidate' | 'comparison' | 'analysis' | 'job-description';
@@ -195,155 +195,6 @@ function CandidateTable({ candidateCount }: { candidateCount: number }) {
             );
           })
         )}
-      </div>
-    </div>
-  );
-}
-
-// ── Job description (read-only) — single-column "preview" layout ─────────────
-
-// Down-then-right elbow connector used as the marker for follow-up questions, so
-// each question reads as branching off the bullet above it (mirrors the chatbot preview).
-function BulletConnector() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="shrink-0 text-indigo-400 mt-[-3px]"
-      width="16" height="22" viewBox="0 0 16 22"
-      fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round"
-    >
-      {/* drop down from the section, round the corner, run right */}
-      <path d="M3 0 V10 a3 3 0 0 0 3 3 H13" />
-      {/* arrowhead pointing right */}
-      <path d="M10.5 10.5 L13.5 13 L10.5 15.5" />
-    </svg>
-  );
-}
-
-// Structured job-description content: top-level sections (plain header), each with
-// several quote-style blocks. A block holds an ordered list of items — bullet points
-// and follow-up questions interleaved — so questions can sit after a mid bullet and
-// at the very end. The whole block (questions included) renders inside the quote style.
-type DocItem = { kind: 'bullet' | 'question'; text: string };
-type JobBlock = { heading: string; body?: string; items: DocItem[] };
-type JobDocSection = { header: string; blocks: JobBlock[] };
-
-const b = (text: string): DocItem => ({ kind: 'bullet', text });
-const q = (text: string): DocItem => ({ kind: 'question', text });
-
-const JOB_DOC: JobDocSection[] = [
-  {
-    header: 'Aufgaben & Verantwortung',
-    blocks: [
-      {
-        heading: 'Service & Wartung vor Ort',
-        body: 'Als Servicetechniker betreust du eigenverantwortlich deine Kunden im Großraum München und sorgst dafür, dass die Kaffeevollautomaten zuverlässig laufen.',
-        items: [
-          b('Wartung, Reparatur und Inbetriebnahme beim Kunden'),
-          b('Eigenständige Tourenplanung mit dem Service-Tool'),
-          q('Mit welchen Diagnose-Tools hast du bereits gearbeitet?'),
-          b('Enger Austausch mit dem Innendienst in Osnabrück'),
-          q('Wie viele Serviceeinsätze betreust du aktuell pro Tag?'),
-        ],
-      },
-      {
-        heading: 'Kundenberatung',
-        body: 'Du bist das Gesicht von Kaffee Partner vor Ort und berätst Kunden rund um Bedienung und Produktauswahl.',
-        items: [
-          b('Beratung zu Bedienung und Produktauswahl'),
-          q('Kannst du ein Beispiel für eine schwierige Kundensituation nennen?'),
-          b('Freundliche, lösungsorientierte Kommunikation'),
-          q('Wie gehst du mit Reklamationen um?'),
-        ],
-      },
-    ],
-  },
-  {
-    header: 'Anforderungen',
-    blocks: [
-      {
-        heading: 'Ausbildung & Qualifikation',
-        items: [
-          b('Abgeschlossene Ausbildung in Elektrotechnik, Mechatronik oder Kfz-Technik'),
-          q('Welche Ausbildung hast du abgeschlossen?'),
-          b('Führerschein Klasse B'),
-          b('Deutsch mindestens B2 (Kundenkontakt)'),
-          q('Besitzt du einen gültigen Führerschein der Klasse B?'),
-        ],
-      },
-      {
-        heading: 'Berufserfahrung',
-        body: 'Idealerweise bringst du erste Erfahrung im technischen Außendienst mit.',
-        items: [
-          b('Mindestens 2 Jahre in einem technischen Beruf'),
-          q('Wie viele Jahre Berufserfahrung hast du im technischen Bereich?'),
-          b('Erfahrung mit Wartung und Reparatur elektronischer Geräte'),
-          q('Warst du bereits im Außendienst tätig?'),
-        ],
-      },
-      {
-        heading: 'Mobilität & Standort',
-        items: [
-          b('Wohnsitz im Großraum München (max. 50 km)'),
-          q('Wo ist dein aktueller Wohnort?'),
-          b('Reisebereitschaft innerhalb der Region'),
-          q('Bist du bereit, regional zu reisen?'),
-        ],
-      },
-    ],
-  },
-  {
-    header: 'Was wir bieten',
-    blocks: [
-      {
-        heading: 'Konditionen & Benefits',
-        items: [
-          b('Unbefristete Festanstellung in einem zukunftssicheren Unternehmen'),
-          b('Firmenwagen, auch zur privaten Nutzung'),
-          q('Welche Gehaltsvorstellung hast du (brutto/Monat)?'),
-          b('30 Tage Urlaub und Weihnachtsgeld'),
-          b('Strukturierte Einarbeitung und Weiterbildung'),
-          q('Ab wann könntest du frühestens starten?'),
-        ],
-      },
-    ],
-  },
-];
-
-function JobDescriptionView() {
-  return (
-    <div className="px-5 pt-5 pb-8">
-      <div className="max-w-3xl mx-auto flex flex-col gap-8">
-        {JOB_DOC.map(section => (
-          <section key={section.header}>
-            {/* Section header — no quote styling */}
-            <h2 className="text-base font-bold text-white mb-4">{section.header}</h2>
-            <div className="flex flex-col gap-5">
-              {section.blocks.map((block, bi) => (
-                // The entire block — heading, body, bullets AND follow-up questions
-                // (interleaved + at the end) — lives inside the quote style.
-                <div key={bi} className="border-l-2 border-indigo-400/60 pl-4">
-                  <h3 className="text-sm font-bold text-white">{block.heading}</h3>
-                  {block.body && (
-                    <p className="mt-1.5 text-sm leading-relaxed text-[#cbd5e1]">{block.body}</p>
-                  )}
-                  <ul className="mt-2 flex flex-col gap-1.5">
-                    {block.items.map((item, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm leading-relaxed text-[#cbd5e1]">
-                        {item.kind === 'question' ? (
-                          <BulletConnector />
-                        ) : (
-                          <span className="mt-[7px] w-1 h-1 rounded-full bg-[#64748b] shrink-0" />
-                        )}
-                        <span>{item.text}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </section>
-        ))}
       </div>
     </div>
   );

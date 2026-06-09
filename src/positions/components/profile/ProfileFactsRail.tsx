@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import wandelLogo from '../../assets/wandel-logo.png';
-import type { Candidate } from '../../types';
-import { CARD_GRADIENT } from '../../theme';
-import { ChannelIcon } from '../../components/ChannelBadge';
+import wandelLogo from '../../../assets/wandel-logo.png';
+import type { Candidate } from '../../../types';
+import { CARD_GRADIENT } from '../../../constants/theme';
+import { ChannelIcon } from '../../../components/ChannelBadge';
 import {
   ageFromDob, formatDate, formatSalary, driversLicenseLabel, initials,
   EDUCATION_TYPE_LABEL, BackLink, Icons, Glyph,

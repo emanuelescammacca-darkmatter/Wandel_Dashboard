@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { mockPositions } from '../mockData';
+import { mockPositions } from '../data/mockData';
 import type { PositionStatus } from '../types';
 
 // Position+Description | Employer | Date | # Candidates | Status | Expand
@@ -31,24 +30,17 @@ const fmt = (d: string) =>
 
 export default function Positions() {
   const navigate = useNavigate();
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const toggle = (id: string) =>
-    setExpanded(prev => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#f5f5f5]">
+    <div className="flex-1 flex flex-col overflow-y-auto bg-[#f5f5f5] p-2.5 gap-2.5">
       {/* ── Title ── */}
-      <div className="px-5 pt-4 pb-3 shrink-0">
+      <div className="shrink-0 pl-3">
         <h1 className="text-lg font-semibold text-gray-900">Positions</h1>
       </div>
 
-      {/* ── Table card ── */}
-      <div className="flex-1 min-h-0 px-5 pb-5">
-        <div className="h-full flex flex-col border border-gray-200 rounded-xl bg-white overflow-hidden">
+      {/* ── Table card (sizes to content; the whole view scrolls) ── */}
+      <div className="shrink-0">
+        <div className="flex flex-col border border-gray-200 rounded-xl bg-white overflow-hidden">
           {/* Header row */}
           <div className={`grid ${COLS} px-5 shrink-0 bg-gray-50 border-b border-gray-200`}>
             <div className="py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Position</div>
@@ -60,23 +52,22 @@ export default function Positions() {
           </div>
 
           {/* Body */}
-          <div className="overflow-y-auto flex-1">
+          <div>
             {mockPositions.length === 0 ? (
               <div className="py-20 text-center text-sm text-gray-400">No positions yet</div>
             ) : (
               mockPositions.map((p, idx) => {
-                const isExpanded = expanded.has(p.id);
                 const isLast = idx === mockPositions.length - 1;
                 return (
                   <div
                     key={p.id}
                     onClick={() => navigate(`/positions/${p.id}`)}
-                    className={`grid ${COLS} hover:bg-gray-50/60 px-5 cursor-pointer ${isLast ? '' : 'border-b border-gray-100'}`}
+                    className={`grid ${COLS} hover:bg-indigo-50/50 px-5 cursor-pointer ${isLast ? '' : 'border-b border-gray-100'}`}
                   >
                     {/* Position + Description */}
                     <div className="py-2.5 pr-6 min-w-0 flex flex-col justify-center gap-0.5">
                       <span className="text-sm font-medium text-gray-800 truncate">{p.title}</span>
-                      <span className={`text-xs text-gray-500 ${isExpanded ? '' : 'truncate'}`}>
+                      <span className="text-xs text-gray-500 truncate">
                         {p.description}
                       </span>
                     </div>
@@ -109,23 +100,13 @@ export default function Positions() {
                     <div className="py-2.5 flex items-center">
                       <PositionStatusBadge status={p.status} />
                     </div>
-                    {/* Expand toggle */}
+                    {/* Open indicator */}
                     <div className="py-2.5 pl-2 flex items-center">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggle(p.id); }}
-                        className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-                        title={isExpanded ? 'Collapse' : 'Expand'}
-                        aria-label={isExpanded ? 'Collapse row' : 'Expand row'}
-                      >
-                        <svg
-                          className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      <span className="w-6 h-6 flex items-center justify-center rounded text-gray-400">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
-                      </button>
+                      </span>
                     </div>
                   </div>
                 );

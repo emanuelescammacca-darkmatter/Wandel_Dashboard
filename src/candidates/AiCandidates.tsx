@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { mockCandidates, uniqueJobTitles } from '../mockData';
+import { mockCandidates, uniqueJobTitles } from '../data/mockData';
 import PipelineStatusBadge, { PIPELINE_STATUS_OPTIONS } from '../components/PipelineStatusBadge';
 import NeedForActionBadge from '../components/NeedForActionBadge';
 import type { NeedForAction, PipelineStatus, Recruiter } from '../types';
@@ -30,7 +30,7 @@ const EXPORT_COLUMNS: { key: string; label: string }[] = [
 ];
 
 // Candidate | Job Identifier | City | Status | Need for Action | Recruiter | Last Contact | Created
-const COLS = 'grid-cols-[1.8fr_1.5fr_0.9fr_1.2fr_1fr_0.9fr_0.9fr_0.9fr]';
+const COLS = 'grid-cols-[1.8fr_1.5fr_0.9fr_1.2fr_1fr_0.9fr_0.9fr_0.9fr_auto]';
 
 const HEADERS = ['Candidate', 'Job Identifier', 'City', 'Status', 'Need for Action', 'Recruiter', 'Last Contact', 'Created'];
 
@@ -185,20 +185,24 @@ export default function AiCandidates() {
   const fmt = (d: string) => new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+    <div className="flex-1 flex flex-col overflow-y-auto bg-[#f5f5f5] p-2.5 gap-2.5">
 
       {/* ── Title ── */}
-      <div className="px-5 pt-4 pb-2 flex items-center justify-between shrink-0">
+      <div className="shrink-0 pl-3">
         <h1 className="text-lg font-semibold text-gray-900">Candidates</h1>
       </div>
 
-      {/* ── Filters ── */}
-      <div className="px-5 pb-4 shrink-0 border-b border-gray-200">
-        <div className="flex gap-2 mb-2">
-          <SearchInput placeholder="Phone number" value={phoneSearch}     onChange={setPhoneSearch}     highlighted={exportOpen} />
-          <SearchInput placeholder="First name"   value={firstNameSearch} onChange={setFirstNameSearch} highlighted={exportOpen} />
-          <SearchInput placeholder="Last name"    value={lastNameSearch}  onChange={setLastNameSearch}  highlighted={exportOpen} />
-        </div>
+      {/* ── Table card (sizes to content; the whole view scrolls) ── */}
+      <div className="shrink-0">
+        <div className="flex flex-col border border-gray-200 rounded-xl bg-white">
+
+          {/* Filters toolbar — integrated into the card header */}
+          <div className="px-5 py-3 border-b border-gray-200 shrink-0 flex flex-col gap-2">
+            <div className="flex gap-2">
+              <SearchInput placeholder="Phone number" value={phoneSearch}     onChange={setPhoneSearch}     highlighted={exportOpen} />
+              <SearchInput placeholder="First name"   value={firstNameSearch} onChange={setFirstNameSearch} highlighted={exportOpen} />
+              <SearchInput placeholder="Last name"    value={lastNameSearch}  onChange={setLastNameSearch}  highlighted={exportOpen} />
+            </div>
         <div className="flex gap-2 items-center">
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
             <label className="text-[11px] text-gray-400 whitespace-nowrap">From</label>
@@ -289,24 +293,25 @@ export default function AiCandidates() {
         </div>
       </div>
 
-      {/* ── Table ── */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className={`grid ${COLS} px-5 shrink-0 relative`}>
-          {HEADERS.map(h => (
-            <div key={h} className="py-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">{h}</div>
-          ))}
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-gray-200" />
-        </div>
+          {/* Column header row */}
+          <div className={`grid ${COLS} px-5 shrink-0 bg-gray-50 border-b border-gray-200`}>
+            {HEADERS.map(h => (
+              <div key={h} className="py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">{h}</div>
+            ))}
+            <div className="py-2.5" />
+          </div>
 
-        <div className="overflow-y-auto flex-1">
+          <div>
           {filtered.length === 0 ? (
             <div className="py-20 text-center text-sm text-gray-400">No candidates found</div>
           ) : (
-            filtered.map(c => (
+            filtered.map((c, idx) => {
+              const isLast = idx === filtered.length - 1;
+              return (
               <div
                 key={c.id}
                 onClick={() => navigate(`${basePath}/${c.id}`)}
-                className={`grid ${COLS} hover:bg-gray-50 cursor-pointer group px-5 relative`}
+                className={`grid ${COLS} hover:bg-indigo-50/50 cursor-pointer px-5 ${isLast ? '' : 'border-b border-gray-100'}`}
               >
                 {/* Candidate */}
                 <div className="py-3 flex items-center gap-2.5 min-w-0">
@@ -355,10 +360,19 @@ export default function AiCandidates() {
                 <div className="py-3 flex items-center">
                   <span className="text-xs text-gray-400">{fmt(c.createdAt)}</span>
                 </div>
-                <div className="absolute bottom-0 left-5 right-5 h-px bg-gray-100" />
+                {/* Open indicator */}
+                <div className="py-3 pl-2 flex items-center">
+                  <span className="w-6 h-6 flex items-center justify-center rounded text-gray-400">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </span>
+                </div>
               </div>
-            ))
+              );
+            })
           )}
+          </div>
         </div>
       </div>
     </div>

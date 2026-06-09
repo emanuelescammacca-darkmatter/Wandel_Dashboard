@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { CARD_GRADIENT } from '../theme';
+import { CARD_GRADIENT } from '../constants/theme';
 import wandelLogo from '../assets/wandel-logo.png';
 
 /* ──────────────────────────────────────────────────────────────────────────

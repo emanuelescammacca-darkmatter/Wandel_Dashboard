@@ -1,15 +1,16 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
-import AiCandidates from './pages/AiCandidates';
-import CandidateDetail from './pages/CandidateDetail';
-import Positions from './pages/Positions';
-import PositionDetail from './pages/PositionDetail';
-import ClientPositions from './pages/ClientPositions';
-import PositionWorkspace from './pages/PositionWorkspace';
-import PositionCandidateDetail from './pages/PositionCandidateDetail';
-import NewPosition from './pages/NewPosition';
-import AskSophia from './pages/AskSophia';
-import Dashboard from './pages/Dashboard';
+import AiCandidates from './candidates/AiCandidates';
+import CandidateDetail from './candidates/CandidateDetail';
+import Positions from './positions/Positions';
+import PositionDetail from './positions/PositionDetail';
+import ClientPositions from './positions/ClientPositions';
+import PositionWorkspace from './positions/PositionWorkspace';
+import Employers from './clients/Employers';
+import PositionCandidateDetail from './positions/PositionCandidateDetail';
+import NewPosition from './positions/NewPosition';
+import AskSophia from './sophia/AskSophia';
+import Dashboard from './dashboard/Dashboard';
 
 function Placeholder({ title }: { title: string }) {
   return (
@@ -43,7 +44,7 @@ export default function App() {
             <Route path="/candidates/:id" element={<CandidateDetail />} />
             <Route path="/positions" element={<Positions />} />
             <Route path="/positions/:id" element={<PositionDetail />} />
-            <Route path="/employers" element={<Placeholder title="Employers" />} />
+            <Route path="/employers" element={<Employers />} />
             <Route path="/clients/new-position" element={<NewPosition />} />
             <Route path="/clients/positions" element={<PositionWorkspace />} />
             <Route path="/clients/positions/candidate/:id" element={<PositionCandidateDetail />} />

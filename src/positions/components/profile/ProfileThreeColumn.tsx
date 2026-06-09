@@ -1,6 +1,6 @@
-import type { Candidate } from '../../types';
-import StatusBadge from '../../components/StatusBadge';
-import { ChannelIcon } from '../../components/ChannelBadge';
+import type { Candidate } from '../../../types';
+import StatusBadge from '../../../components/StatusBadge';
+import { ChannelIcon } from '../../../components/ChannelBadge';
 import {
   ageFromDob, formatDate, formatSalary, driversLicenseLabel, initials,
   EDUCATION_TYPE_LABEL, EDUCATION_TYPE_STYLE, BackLink, Icons, Glyph,

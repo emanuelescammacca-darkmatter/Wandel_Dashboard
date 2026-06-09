@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type ReactNode, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { NavLink } from 'react-router-dom';
 import wandelLogo from '../assets/wandel-logo.png';
-import { useCreatedPositions } from '../positionsStore';
+import { useCreatedPositions } from '../lib/positionsStore';
 
 // Numbered square badge (matches the static "1"/"2" icons) for dynamically added positions.
 const numberIcon = (n: number) => (
@@ -64,7 +64,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Candidates',      path: '/candidates',      icon: Icons.candidates },
       { label: 'Positions',       path: '/positions',       icon: Icons.positions },
-      { label: 'Employers',       path: '/employers',       icon: Icons.employers },
+      { label: 'Clients',         path: '/employers',       icon: Icons.employers },
     ],
   },
   {

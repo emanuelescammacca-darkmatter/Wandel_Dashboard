@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CARD_GRADIENT } from '../theme';
+import { CARD_GRADIENT } from '../constants/theme';
 import { WandelBadge, ChatMessage, WaveBackground, CHATBOT_CARD_HOVER, CHATBOT_COMPOSER_GLOW } from '../components/SophiaChrome';
 import { useTypewriter } from '../hooks/useTypewriter';
-import { addCreatedPosition } from '../positionsStore';
+import { addCreatedPosition } from '../lib/positionsStore';
 
 interface Message {
   id: number;

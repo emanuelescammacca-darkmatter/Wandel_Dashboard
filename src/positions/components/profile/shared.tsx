@@ -1,4 +1,4 @@
-import type { EducationEntry } from '../../types';
+import type { EducationEntry } from '../../../types';
 
 /** Compute age in full years from an ISO date string. */
 export function ageFromDob(dob: string | null | undefined): number | null {

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CARD_GRADIENT } from '../theme';
+import { CARD_GRADIENT } from '../constants/theme';
 import { WandelBadge, ChatMessage, WaveBackground, CHATBOT_CARD_HOVER, CHATBOT_COMPOSER_GLOW } from '../components/SophiaChrome';
 import { useTypewriter } from '../hooks/useTypewriter';
-import { ALL_CANDIDATES, CandidateCard, type Cand } from './Dashboard';
+import { ALL_CANDIDATES, CandidateCard, type Cand } from '../dashboard/Dashboard';
 
 // Initials avatar helper for the comparison-table header.
 const initials = (n: string) => n.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();

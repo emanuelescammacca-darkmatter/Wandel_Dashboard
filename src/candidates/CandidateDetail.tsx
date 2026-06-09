@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { mockCandidates } from '../mockData';
-import PipelineStatusBadge from '../components/PipelineStatusBadge';
-import NeedForActionBadge from '../components/NeedForActionBadge';
+import { mockCandidates } from '../data/mockData';
 import type { AnalysisOutcome } from '../types';
 
 // Soft top/bottom fade on scroll containers so content fades out instead of being cut off
@@ -42,14 +40,6 @@ function Label({ children, compact = false }: { children: React.ReactNode; compa
     <p className={`font-semibold text-gray-400 uppercase tracking-wider ${compact ? 'text-[9px] mb-0.5' : 'text-[11px] mb-1.5'}`}>
       {children}
     </p>
-  );
-}
-
-function CardTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/80 shrink-0">
-      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{children}</p>
-    </div>
   );
 }
 
@@ -207,34 +197,19 @@ function RichTextEditor({ label, defaultValue, onChange, minHeight = 100 }: {
           <ToolbarButton onClick={() => exec('underline')} title="Underline">
             <span className="text-xs underline">U</span>
           </ToolbarButton>
-          <ToolbarButton
-            onClick={() => {
-              const url = prompt('Link URL:');
-              if (url) exec('createLink', url);
-            }}
-            title="Insert link"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 11-5.656-5.656l1.5-1.5m6.828-1.328a4 4 0 015.656 0l3 3a4 4 0 010 5.656l-1.5 1.5" transform="rotate(-45 12 12)" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 15l6-6" />
-            </svg>
-          </ToolbarButton>
           <div className="w-px h-4 bg-gray-200 mx-1" />
-          <ToolbarButton onClick={() => exec('insertOrderedList')} title="Ordered list">
+          <ToolbarButton onClick={() => exec('insertUnorderedList')} title="Bullet list">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 6h13M7 12h13M7 18h13M3 6h.01M3 12h.01M3 18h.01" />
             </svg>
           </ToolbarButton>
-          <ToolbarButton onClick={() => exec('insertUnorderedList')} title="Bullet list">
+          <ToolbarButton onClick={() => exec('insertOrderedList')} title="Numbered list">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 6h11M9 12h11M9 18h11" />
+              <text x="2.5" y="8.5" fontSize="7" fontWeight="bold" fill="currentColor" stroke="none">1</text>
+              <text x="2.5" y="14.5" fontSize="7" fontWeight="bold" fill="currentColor" stroke="none">2</text>
+              <text x="2.5" y="20.5" fontSize="7" fontWeight="bold" fill="currentColor" stroke="none">3</text>
             </svg>
-          </ToolbarButton>
-          <div className="w-px h-4 bg-gray-200 mx-1" />
-          <ToolbarButton onClick={() => exec('removeFormat')} title="Clear formatting">
-            <span className="text-xs font-semibold">
-              T<sub className="text-[8px]">x</sub>
-            </span>
           </ToolbarButton>
         </div>
         <div
@@ -531,19 +506,20 @@ function AddNoteButton({ onClick, label = 'Add Note' }: { onClick: () => void; l
 }
 
 // Note section for an entry card — titled, shaded, editor only while editing, no inner box
-function EntryNote({ value, editing, onChange, onStartEdit, onStopEdit, addLabel }: {
+function EntryNote({ value, editing, onChange, onStartEdit, onStopEdit, addLabel, label = 'Notes' }: {
   value: string;
   editing: boolean;
   onChange: (v: string) => void;
   onStartEdit: () => void;
   onStopEdit: () => void;
   addLabel?: string;
+  label?: string;
 }) {
   const hasContent = noteHasContent(value);
   return (
     <div className="flex flex-col gap-1">
-      {(editing || hasContent) && (
-        <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider">Notes</p>
+      {label && (editing || hasContent) && (
+        <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
       )}
       {editing ? (
         <div className="flex flex-col gap-2">
@@ -591,11 +567,15 @@ const APPLIED_POSITION_STATUS: Record<AppliedPositionStatus, { label: string; cl
 type ContactType = 'whatsapp' | 'hr_call' | 'sophia_call';
 type ContactPoint = { id: string; type: ContactType; at: string }; // at = ISO timestamp
 
-const CONTACT_META: Record<ContactType, { label: string; dot: string; ring: string; icon: React.ReactNode }> = {
+const CONTACT_META: Record<ContactType, { label: string; dot: string; border: string; glow: string; hoverIcon: string; hoverTitle: string; activeTitle: string; icon: React.ReactNode }> = {
   whatsapp: {
     label: 'WhatsApp Message',
     dot: 'bg-emerald-500',
-    ring: 'border-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]',
+    border: 'border-emerald-500',
+    glow: 'shadow-[0_0_0_3px_rgba(16,185,129,0.18)]',
+    hoverIcon: 'group-hover:text-emerald-500',
+    hoverTitle: 'group-hover:text-emerald-600',
+    activeTitle: 'text-emerald-600',
     icon: (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M8 12h.01M12 12h.01M16 12h.01M21 12a9 9 0 01-13.255 7.93L3 21l1.07-4.745A9 9 0 1121 12z" />
     ),
@@ -603,7 +583,11 @@ const CONTACT_META: Record<ContactType, { label: string; dot: string; ring: stri
   hr_call: {
     label: 'HR-Team Call',
     dot: 'bg-sky-500',
-    ring: 'border-sky-500 shadow-[0_0_0_3px_rgba(14,165,233,0.12)]',
+    border: 'border-sky-500',
+    glow: 'shadow-[0_0_0_3px_rgba(14,165,233,0.18)]',
+    hoverIcon: 'group-hover:text-sky-500',
+    hoverTitle: 'group-hover:text-sky-600',
+    activeTitle: 'text-sky-600',
     icon: (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.95.68l1.5 4.5a1 1 0 01-.5 1.21l-2.26 1.13a11 11 0 005.52 5.52l1.13-2.26a1 1 0 011.21-.5l4.5 1.5a1 1 0 01.68.95V19a2 2 0 01-2 2h-1C9.72 21 3 14.28 3 6V5z" />
     ),
@@ -611,7 +595,11 @@ const CONTACT_META: Record<ContactType, { label: string; dot: string; ring: stri
   sophia_call: {
     label: 'Sophia Call',
     dot: 'bg-indigo-500',
-    ring: 'border-indigo-500 shadow-[0_0_0_3px_rgba(99,102,241,0.12)]',
+    border: 'border-indigo-500',
+    glow: 'shadow-[0_0_0_3px_rgba(99,102,241,0.18)]',
+    hoverIcon: 'group-hover:text-indigo-500',
+    hoverTitle: 'group-hover:text-indigo-600',
+    activeTitle: 'text-indigo-600',
     icon: (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.95.68l1.5 4.5a1 1 0 01-.5 1.21l-2.26 1.13a11 11 0 005.52 5.52l1.13-2.26a1 1 0 011.21-.5l4.5 1.5a1 1 0 01.68.95V19a2 2 0 01-2 2h-1C9.72 21 3 14.28 3 6V5z" />
     ),
@@ -638,10 +626,12 @@ const CALL_TAGS: { title: string; icon: React.ReactNode }[] = [
 
 // ── ChannelCard — Sophia Call / WhatsApp etc.: left = conversation, right = title/description/tags ─
 
-function ChannelCard({ id, onClose, headerLabel, headerMeta, info, initialTitle = '', noteTaker = false, noteAddLabel, impressionLabel, titleLabel, children }: {
+function ChannelCard({ id, onClose, headerLabel, headerIcon, headerColor, headerMeta, info, initialTitle = '', noteTaker = false, noteAddLabel, impressionLabel, titleLabel, titleHeading, children }: {
   id?: string;
   onClose?: () => void;
   headerLabel: string;
+  headerIcon?: React.ReactNode;
+  headerColor?: string;
   headerMeta?: React.ReactNode;
   info?: React.ReactNode;
   initialTitle?: string;
@@ -649,6 +639,7 @@ function ChannelCard({ id, onClose, headerLabel, headerMeta, info, initialTitle 
   noteAddLabel?: string;
   impressionLabel?: string;
   titleLabel?: string;
+  titleHeading?: string;
   children: React.ReactNode;
 }) {
   const [infoOpen, setInfoOpen] = useState(false);
@@ -699,17 +690,27 @@ function ChannelCard({ id, onClose, headerLabel, headerMeta, info, initialTitle 
         {info ? (
           <button
             onClick={() => setInfoOpen(o => !o)}
-            className="px-5 py-3 flex items-center gap-2.5 bg-gray-50/80 border-b border-gray-100 hover:bg-gray-100/60 transition-colors text-left shrink-0"
+            className="px-5 h-12 flex items-center gap-2 bg-gray-50/80 border-b border-gray-100 hover:bg-gray-100/60 transition-colors text-left shrink-0"
           >
-            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{headerLabel}</p>
+            {headerIcon && (
+              <svg className={`w-4 h-4 shrink-0 ${headerColor ?? 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {headerIcon}
+              </svg>
+            )}
+            <p className={`text-[11px] font-semibold uppercase tracking-wider ${headerColor ?? 'text-gray-500'}`}>{headerLabel}</p>
             {headerMeta}
             <svg className={`w-3.5 h-3.5 text-gray-400 ml-auto transition-transform ${infoOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
         ) : (
-          <div className="px-5 py-3 flex items-center gap-2.5 bg-gray-50/80 border-b border-gray-100 shrink-0">
-            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{headerLabel}</p>
+          <div className="px-5 h-12 flex items-center gap-2 bg-gray-50/80 border-b border-gray-100 shrink-0">
+            {headerIcon && (
+              <svg className={`w-4 h-4 shrink-0 ${headerColor ?? 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {headerIcon}
+              </svg>
+            )}
+            <p className={`text-[11px] font-semibold uppercase tracking-wider ${headerColor ?? 'text-gray-500'}`}>{headerLabel}</p>
             {headerMeta}
           </div>
         )}
@@ -723,11 +724,16 @@ function ChannelCard({ id, onClose, headerLabel, headerMeta, info, initialTitle 
       <div className="flex flex-col min-w-0 overflow-hidden">
         <div className="pl-4 pr-10 py-3 overflow-y-auto flex flex-col gap-3" style={scrollFadeStyle}>
           {impressionLabel ? (
-            <NoteField boldLabel label={impressionLabel} value={note} onChange={setNote} placeholder="Add impression" />
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-semibold text-gray-800">{impressionLabel}</p>
+              <NoteField value={note} onChange={setNote} placeholder="Add evaluation" minHeight={120} />
+            </div>
           ) : (
             <>
           <div className="flex flex-col gap-1">
-            {titleLabel ? (
+            {titleHeading ? (
+              <p className="text-sm font-semibold text-gray-800">{titleHeading}</p>
+            ) : titleLabel ? (
               <NoteField boldLabel label={titleLabel} value={title} onChange={setTitle} placeholder="Add note" />
             ) : (
               <NoteField plain value={title} onChange={setTitle} placeholder="Add title" />
@@ -742,7 +748,7 @@ function ChannelCard({ id, onClose, headerLabel, headerMeta, info, initialTitle 
                 addLabel={noteAddLabel}
               />
             ) : (
-              <NoteField plain multiline value={description} onChange={setDescription} placeholder="Add description" />
+              <NoteField value={description} onChange={setDescription} placeholder="Add evaluation" minHeight={120} />
             )}
           </div>
           {!noteTaker && (
@@ -912,6 +918,171 @@ function HrTeamLeft() {
   );
 }
 
+// ── Final Verdict window — match evaluation (left 75%) + accept/match decision (right 25%) ──
+function VerdictCard({ onClose, onAccept, positionTitle, candidateName }: { onClose: () => void; onAccept?: () => void; positionTitle: string; candidateName: string }) {
+  const [evaluationRun, setEvaluationRun] = useState(false);
+  const [matched, setMatched] = useState(false);
+
+  // Mock AI match evaluation of this candidate against the position
+  const evaluation = {
+    score: 87,
+    verdict: 'Strong match',
+    summary: `${candidateName} is a strong fit for the ${positionTitle} role — directly relevant field-service experience paired with a clear customer-service mindset.`,
+    dimensions: [
+      { label: 'Technical skills', score: 92, note: 'Hands-on repair & diagnostics on comparable equipment.' },
+      { label: 'Experience relevance', score: 88, note: 'Several years in adjacent service-technician roles.' },
+      { label: 'Location & mobility', score: 80, note: 'Based in the target region; comfortable with field routes.' },
+      { label: 'Availability', score: 85, note: 'Can start within the expected notice period.' },
+    ],
+    strengths: ['Relevant hands-on service experience', 'Strong customer-facing communication', 'Regional & mobility fit'],
+    considerations: ['Limited exposure to the specific machine line', 'Salary expectations still to be confirmed'],
+  };
+
+  const ring = evaluation.score >= 85 ? 'border-emerald-400 text-emerald-600'
+    : evaluation.score >= 70 ? 'border-amber-400 text-amber-600'
+    : 'border-red-400 text-red-600';
+  const bar = (s: number) => (s >= 85 ? 'bg-emerald-500' : s >= 70 ? 'bg-amber-500' : 'bg-red-500');
+
+  return (
+    <div id="card-verdict" className="relative scroll-mt-4 bg-white border border-gray-200 rounded-xl overflow-hidden flex h-full">
+
+      {/* Left 75% — match evaluation */}
+      <div className="flex flex-col min-w-0 flex-1 border-r border-gray-100 overflow-hidden">
+        <div className="px-5 h-12 flex items-center gap-2 bg-gray-50/80 border-b border-gray-100 shrink-0">
+          <svg className="w-4 h-4 shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3 3v1.5M3 21v-6m0 0l2.77-.693a9 9 0 016.208.682l.108.054a9 9 0 006.086.71l3.114-.732a48.524 48.524 0 01-.005-10.499l-3.11.732a9 9 0 01-6.085-.711l-.108-.054a9 9 0 00-6.208-.682L3 4.5M3 15V4.5" />
+          </svg>
+          <p className="text-[11px] font-semibold text-amber-600 uppercase tracking-wider">Final Verdict</p>
+        </div>
+
+        {!evaluationRun ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
+            <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center">
+              <svg className="w-7 h-7 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.4} d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+              </svg>
+            </div>
+            <p className="text-sm text-gray-500 max-w-xs leading-relaxed">Run an AI match evaluation to score how well {candidateName} fits the {positionTitle} role.</p>
+            <button
+              onClick={() => setEvaluationRun(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+              </svg>
+              Match Evaluation
+            </button>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-6" style={scrollFadeStyle}>
+            {/* Score + summary */}
+            <div className="flex items-center gap-4">
+              <div className={`shrink-0 w-16 h-16 rounded-full border-4 flex items-center justify-center ${ring}`}>
+                <span className="text-lg font-bold leading-none">{evaluation.score}</span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-800">{evaluation.verdict}</p>
+                <p className="text-xs text-gray-500 leading-relaxed mt-0.5">{evaluation.summary}</p>
+              </div>
+            </div>
+            {/* Dimensions */}
+            <div className="flex flex-col gap-3.5">
+              {evaluation.dimensions.map(d => (
+                <div key={d.label} className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-gray-700">{d.label}</span>
+                    <span className="text-xs font-semibold text-gray-500 tabular-nums">{d.score}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                    <div className={`h-full rounded-full ${bar(d.score)}`} style={{ width: `${d.score}%` }} />
+                  </div>
+                  <p className="text-[11px] text-gray-400 leading-snug">{d.note}</p>
+                </div>
+              ))}
+            </div>
+            {/* Strengths & considerations */}
+            <div className="grid grid-cols-2 gap-5">
+              <div className="flex flex-col gap-2">
+                <Label compact>Strengths</Label>
+                <ul className="flex flex-col gap-1.5">
+                  {evaluation.strengths.map(s => (
+                    <li key={s} className="flex items-start gap-1.5 text-xs text-gray-600 leading-snug">
+                      <svg className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label compact>Considerations</Label>
+                <ul className="flex flex-col gap-1.5">
+                  {evaluation.considerations.map(c => (
+                    <li key={c} className="flex items-start gap-1.5 text-xs text-gray-600 leading-snug">
+                      <svg className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                      </svg>
+                      <span>{c}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Right 25% — decision */}
+      <div className="flex flex-col min-w-0 basis-1/4 shrink-0 overflow-hidden">
+        <div className="px-4 h-12 flex items-center gap-2 bg-gray-50/80 border-b border-gray-100 shrink-0">
+          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider truncate">Decision</p>
+          <button
+            onClick={onClose}
+            title="Close"
+            className="ml-auto -m-1 p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-5 flex flex-col gap-3" style={scrollFadeStyle}>
+          {matched ? (
+            <div className="flex flex-col items-center justify-center text-center gap-2 flex-1">
+              <div className="w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center">
+                <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold text-gray-800">Candidate matched</p>
+              <p className="text-xs text-gray-500 leading-relaxed">{candidateName} has been matched to {positionTitle}.</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-gray-500 leading-relaxed">Accept this verdict to match {candidateName} with the {positionTitle} position.</p>
+              <button
+                onClick={() => { setMatched(true); onAccept?.(); }}
+                disabled={!evaluationRun}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                Accept &amp; Match
+              </button>
+              {!evaluationRun && (
+                <p className="text-[11px] text-gray-400 text-center leading-snug">Run the match evaluation first.</p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function CandidateDetail() {
@@ -943,9 +1114,14 @@ export default function CandidateDetail() {
   });
   const set = (key: keyof typeof form) => (v: string) => setForm(f => ({ ...f, [key]: v }));
 
-  // Background & Experience state
-  const [changeMotivation, setChangeMotivation] = useState(candidate?.jobChangeMotivation ?? '');
-  const [specialSkills, setSpecialSkills]       = useState(candidate?.specialSkills ?? '');
+  // Background & Experience state — Change Motivation / Special Skills as multi-item note lists
+  const [changeMotivations, setChangeMotivations] = useState<{ id: string; value: string }[]>(
+    () => (candidate?.jobChangeMotivation ? [{ id: 'cm-0', value: candidate.jobChangeMotivation }] : [])
+  );
+  const [specialSkillsItems, setSpecialSkillsItems] = useState<{ id: string; value: string }[]>(
+    () => (candidate?.specialSkills ? [{ id: 'ss-0', value: candidate.specialSkills }] : [])
+  );
+  const noteItemId = useRef(0);
 
   const [trainings, setTrainings] = useState<TrainingEntry[]>([
     {
@@ -1025,16 +1201,26 @@ export default function CandidateDetail() {
   const togglePosition = (id: string) =>
     setSelectedPosition(prev => (prev === id ? null : id));
   const [jobDescCollapsed, setJobDescCollapsed] = useState(false);
+  // CV & Documents: which document is open in the viewer (right pane). Null = list only.
+  const [openDoc, setOpenDoc] = useState<{ name: string; url: string } | null>(null);
 
   // Channel cards at the bottom are hidden until their contact-history link is clicked
   const [sophiaOpen, setSophiaOpen] = useState(false);
   const [whatsappOpen, setWhatsappOpen] = useState(false);
   const [hrOpen, setHrOpen] = useState(false);
-  const openCard = (which: 'sophia' | 'whatsapp' | 'hr') => {
+  const [verdictOpen, setVerdictOpen] = useState(false);
+  const [docsOpen, setDocsOpen] = useState(false);
+  const [instantOpen, setInstantOpen] = useState(false);
+  const openCard = (which: 'sophia' | 'whatsapp' | 'hr' | 'verdict' | 'documents' | 'instant') => {
     setSophiaOpen(which === 'sophia');
     setWhatsappOpen(which === 'whatsapp');
     setHrOpen(which === 'hr');
-    const tid = which === 'sophia' ? 'card-sophia' : which === 'whatsapp' ? 'card-whatsapp' : 'card-hr';
+    setVerdictOpen(which === 'verdict');
+    setDocsOpen(which === 'documents');
+    setInstantOpen(which === 'instant');
+    const tid = which === 'sophia' ? 'card-sophia' : which === 'whatsapp' ? 'card-whatsapp'
+      : which === 'hr' ? 'card-hr' : which === 'verdict' ? 'card-verdict'
+      : which === 'documents' ? 'card-documents' : 'card-instant';
     requestAnimationFrame(() => requestAnimationFrame(() =>
       document.getElementById(tid)?.scrollIntoView({ behavior: 'smooth', block: 'start' })));
   };
@@ -1060,6 +1246,18 @@ export default function CandidateDetail() {
   const [editingNoteIds, setEditingNoteIds] = useState<Set<string>>(() => new Set());
   const startNoteEdit = (id: string) => setEditingNoteIds(s => new Set(s).add(id));
   const stopNoteEdit  = (id: string) => setEditingNoteIds(s => { const n = new Set(s); n.delete(id); return n; });
+
+  // Add / update / remove items in a note-list (Change Motivation, Special Skills)
+  type NoteListSetter = React.Dispatch<React.SetStateAction<{ id: string; value: string }[]>>;
+  const addNoteItem = (setter: NoteListSetter, prefix: string) => {
+    const id = `${prefix}-${++noteItemId.current}`;
+    setter(prev => [...prev, { id, value: '' }]);
+    startNoteEdit(id);
+  };
+  const updateNoteItem = (setter: NoteListSetter, id: string, value: string) =>
+    setter(prev => prev.map(it => (it.id === id ? { ...it, value } : it)));
+  const removeNoteItem = (setter: NoteListSetter, id: string) =>
+    setter(prev => prev.filter(it => it.id !== id));
 
   const updateTraining = (id: string, patch: Partial<TrainingEntry>) =>
     setTrainings(prev => prev.map(t => (t.id === id ? { ...t, ...patch } : t)));
@@ -1118,7 +1316,7 @@ export default function CandidateDetail() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Applied positions — read-only, seeded from candidate (no backing model field)
-  const appliedPositions: AppliedPosition[] = [
+  const [appliedPositions, setAppliedPositions] = useState<AppliedPosition[]>(() => [
     {
       id: 'ap1',
       title: candidate?.jobTitle || 'Servicetechniker',
@@ -1126,14 +1324,75 @@ export default function CandidateDetail() {
     },
     { id: 'ap2', title: 'Instandhaltungstechniker', status: 'in-progress' },
     { id: 'ap3', title: 'Mechatroniker (Schicht)', status: 'applied' },
-  ];
+  ]);
+  const updatePositionStatus = (id: string, status: AppliedPositionStatus) =>
+    setAppliedPositions(prev => prev.map(p => (p.id === id ? { ...p, status } : p)));
 
-  // Contact history — read-only, seeded from candidate timestamps, oldest → newest
-  const contactPoints: ContactPoint[] = [
-    { id: 'cp1', type: 'whatsapp',    at: candidate?.createdAt ?? '2026-04-11T11:05:00Z' },
-    { id: 'cp2', type: 'sophia_call', at: '2026-04-12T10:42:00Z' },
-    { id: 'cp3', type: 'hr_call',     at: candidate?.lastContactAt ?? '2026-04-14T14:30:00Z' },
-  ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+  // Contact history — seeded from candidate timestamps (oldest → newest); HR can add new calls
+  const [contactPoints, setContactPoints] = useState<ContactPoint[]>(() => {
+    const seed: ContactPoint[] = [
+      { id: 'cp1', type: 'whatsapp',    at: candidate?.createdAt ?? '2026-04-11T11:05:00Z' },
+      { id: 'cp2', type: 'sophia_call', at: '2026-04-12T10:42:00Z' },
+      { id: 'cp3', type: 'hr_call',     at: candidate?.lastContactAt ?? '2026-04-14T14:30:00Z' },
+    ];
+    return seed.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+  });
+  const addHrCall = () =>
+    setContactPoints(prev => [...prev, { id: `cp-${Date.now()}`, type: 'hr_call', at: new Date().toISOString() }]);
+  const removeContactPoint = (id: string) =>
+    setContactPoints(prev => prev.filter(c => c.id !== id));
+
+  // Final Verdict & CV & Documents are single-instance nodes — present by default, removable, re-addable via the + menu
+  const [verdictPresent, setVerdictPresent] = useState(true);
+  const [verdictMatchedAt, setVerdictMatchedAt] = useState<string | null>(null); // set when the candidate is matched
+  const [documentsPresent, setDocumentsPresent] = useState(true);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+
+  // Resizable split between the top section and the opened contact-history window (bottom).
+  // Default = half / half; drag the handle (or arrow keys) to extend or reduce the window.
+  const [windowRatio, setWindowRatio] = useState(0.5); // bottom window's share of the vertical split
+  const [windowResizing, setWindowResizing] = useState(false);
+  const splitColRef = useRef<HTMLDivElement>(null);
+  const startWindowResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setWindowResizing(true);
+    const onMove = (ev: MouseEvent) => {
+      const el = splitColRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const frac = (rect.bottom - ev.clientY) / rect.height;
+      setWindowRatio(Math.min(Math.max(frac, 0.2), 0.8));
+    };
+    const onUp = () => {
+      setWindowResizing(false);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  };
+  const onWindowHandleKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowUp') { e.preventDefault(); setWindowRatio(r => Math.min(r + 0.05, 0.8)); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); setWindowRatio(r => Math.max(r - 0.05, 0.2)); }
+  };
+
+  // Uploaded CV / documents — only files that have actually been uploaded are listed
+  const [documents, setDocuments] = useState<{ name: string; url: string }[]>([
+    { name: 'Lebenslauf.pdf', url: '#' },
+    { name: 'Arbeitszeugnis_Bosch.pdf', url: '#' },
+  ]);
+  const docInputRef = useRef<HTMLInputElement>(null);
+  const handleUploadDocument = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const added = Array.from(files).map(f => ({ name: f.name, url: URL.createObjectURL(f) }));
+    setDocuments(prev => [...prev, ...added]);
+    e.target.value = '';
+  };
 
   if (!candidate) {
     return (
@@ -1214,19 +1473,63 @@ export default function CandidateDetail() {
     </div>
   );
 
-  const splitMode = sophiaOpen || whatsappOpen || hrOpen;
+  const splitMode = sophiaOpen || whatsappOpen || hrOpen || verdictOpen || docsOpen || instantOpen;
   const selectedPos = appliedPositions.find(p => p.id === selectedPosition) ?? null;
 
+  // A single call node in the contact-history timeline (WhatsApp / Sophia / HR).
+  const renderContactNode = (cp: { id: string; type: ContactType; at: string }) => {
+    const meta = CONTACT_META[cp.type];
+    const which = cp.type === 'sophia_call' ? 'sophia'
+      : cp.type === 'whatsapp' ? 'whatsapp'
+      : 'hr';
+    const opened = (which === 'sophia' && sophiaOpen)
+      || (which === 'whatsapp' && whatsappOpen)
+      || (which === 'hr' && hrOpen);
+    return (
+      <li key={cp.id} className="relative group">
+        <span aria-hidden className="absolute left-[-21px] top-[8px] h-[calc(100%+1rem)] w-[2px] rounded-full bg-gray-300" />
+        <span className={`absolute -left-7 top-0 w-4 h-4 rounded-full border-2 bg-white flex items-center justify-center ${meta.border} ${opened ? meta.glow : ''}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+        </span>
+        {cp.type === 'hr_call' && (
+          <button
+            onClick={() => removeContactPoint(cp.id)}
+            title="Remove call"
+            className="absolute top-0 right-0 z-10 p-1 rounded-full text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 transition-all"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+        <button onClick={() => openCard(which)} className="group text-left w-full" title={`Open ${meta.label}`}>
+          <div className="flex items-center gap-1.5">
+            <svg className={`w-3.5 h-3.5 shrink-0 transition-colors ${opened ? meta.activeTitle : `text-gray-400 ${meta.hoverIcon}`}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {meta.icon}
+            </svg>
+            <p className={`text-[12px] font-medium leading-tight transition-colors ${opened ? meta.activeTitle : `text-gray-800 ${meta.hoverTitle}`}`}>{meta.label}</p>
+          </div>
+          <p className="text-[11px] text-gray-400 mt-0.5 tabular-nums">
+            {formatTimeOfDay(cp.at)} · {formatDay(cp.at)}
+          </p>
+        </button>
+      </li>
+    );
+  };
+
   return (
-    <div className={`flex-1 bg-[#f5f5f5] ${splitMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-      <div className={`p-2.5 flex flex-col gap-2.5 ${splitMode ? 'h-full' : ''}`}>
-        <div className={`flex gap-2.5 ${splitMode ? 'flex-[14] min-h-0 items-stretch' : 'items-start'}`}>
+    <div className="flex-1 bg-[#f5f5f5] overflow-hidden">
+      <div ref={splitColRef} className="p-2.5 flex flex-col h-full">
+        <div
+          className={`flex gap-2.5 items-stretch min-h-0 ${splitMode ? '' : 'flex-1'}`}
+          style={splitMode ? { flexGrow: 1 - windowRatio, flexShrink: 1, flexBasis: 0 } : undefined}
+        >
 
         {/* ══ LEFT BAR: Personal information — compact vertical sidebar ══ */}
-        <aside className={`w-60 shrink-0 bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col ${splitMode ? 'h-full' : ''}`}>
+        <aside className="w-60 shrink-0 bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full">
           <div
-            className={`px-4 py-4 flex flex-col gap-3 ${splitMode ? 'overflow-y-auto' : ''}`}
-            style={splitMode ? scrollFadeStyle : undefined}
+            className="px-4 py-4 flex flex-col gap-3 overflow-y-auto"
+            style={scrollFadeStyle}
           >
 
           <button
@@ -1270,16 +1573,45 @@ export default function CandidateDetail() {
               </p>
             </div>
           </div>
+
+          {/* CV & Documents — only uploaded files are shown */}
+          {documents.length > 0 && (
+            <>
+              <div className="h-px bg-gray-100" />
+              <div className="flex flex-col gap-1.5">
+                <Label compact>CV &amp; Documents</Label>
+                {documents.map(doc => (
+                  <button
+                    key={doc.name}
+                    onClick={() => { setDocumentsPresent(true); openCard('documents'); setOpenDoc(doc); }}
+                    title={`Open ${doc.name}`}
+                    className="group flex items-center gap-2 px-2.5 py-1.5 border border-gray-200 rounded-lg text-left hover:border-indigo-300 hover:bg-indigo-50/40 transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="text-xs text-gray-700 truncate flex-1 group-hover:text-indigo-700 transition-colors">{doc.name}</span>
+                    <svg className="w-3 h-3 text-gray-300 shrink-0 group-hover:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           </div>
         </aside>
 
         {/* ══ RIGHT COLUMN: everything else ══ */}
-        <div className={`flex-1 min-w-0 flex flex-col gap-2.5 ${splitMode ? 'min-h-0' : ''}`}>
+        <div
+          className={`flex-1 min-w-0 min-h-0 flex flex-col gap-2.5 ${splitMode ? '' : 'overflow-y-auto py-3 -my-3'}`}
+          style={!splitMode ? scrollFadeStyle : undefined}
+        >
 
         {/* ══ Job Description — selected position name; shown only when a position is checked ══ */}
         {selectedPos && (
-        <div className={`bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col ${splitMode ? (jobDescCollapsed ? 'shrink-0' : 'flex-1 min-h-0') : ''}`}>
-          <div className={`overflow-y-auto ${splitMode && !jobDescCollapsed ? 'flex-1 min-h-0' : 'max-h-56'}`} style={scrollFadeStyle}>
+        <div className={`bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col ${splitMode ? (jobDescCollapsed ? 'shrink-0' : 'flex-1 min-h-0') : 'shrink-0'}`}>
+          <div className={splitMode && !jobDescCollapsed ? 'flex-1 min-h-0 overflow-y-auto' : ''} style={splitMode && !jobDescCollapsed ? scrollFadeStyle : undefined}>
           <div className="flex items-center justify-between gap-2 px-5 py-3.5">
             <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider truncate">{selectedPos.title}</span>
             <button
@@ -1330,7 +1662,7 @@ Wir bieten:
         )}
 
         {/* ══ Background & Experience (full width, top of central column) ══ */}
-        <div className={`bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col ${splitMode ? 'flex-1 min-h-0' : ''}`}>
+        <div className={`bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col ${splitMode ? 'flex-1 min-h-0' : 'shrink-0'}`}>
             <div className={`p-5 flex flex-col gap-6 ${splitMode ? 'flex-1 min-h-0 overflow-y-auto' : ''}`} style={splitMode ? scrollFadeStyle : undefined}>
 
               {/* Training (top) + Experiences (bottom) */}
@@ -1462,20 +1794,69 @@ Wir bieten:
                 </div>
               </div>
 
-              {/* Notes below the sections — editor only while editing, else rendered content */}
-              <div className="flex flex-col gap-5">
-                <NoteField
-                  label="Change Motivation"
-                  value={changeMotivation}
-                  onChange={setChangeMotivation}
-                  placeholder="Add change motivation"
-                />
-                <NoteField
-                  label="Special Skills"
-                  value={specialSkills}
-                  onChange={setSpecialSkills}
-                  placeholder="Add special skills"
-                />
+              {/* Notes below the sections — multi-item lists, same note taker as the experience entries */}
+              <div className="flex flex-col gap-6">
+                <div>
+                  <label className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider block mb-2">Change Motivation</label>
+                  <div className="flex flex-col gap-2">
+                    {changeMotivations.map(item => (
+                      <div key={item.id} className="flex items-start gap-1.5">
+                        <div className="flex-1 min-w-0">
+                          <EntryNote
+                            label=""
+                            addLabel="Add change motivation"
+                            value={item.value}
+                            editing={editingNoteIds.has(item.id)}
+                            onChange={v => updateNoteItem(setChangeMotivations, item.id, v)}
+                            onStartEdit={() => startNoteEdit(item.id)}
+                            onStopEdit={() => stopNoteEdit(item.id)}
+                          />
+                        </div>
+                        <button
+                          onClick={() => removeNoteItem(setChangeMotivations, item.id)}
+                          title="Remove"
+                          className="shrink-0 mt-0.5 -m-1 p-1 rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                    <AddButton label="Add change motivation" onClick={() => addNoteItem(setChangeMotivations, 'cm')} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider block mb-2">Special Skills</label>
+                  <div className="flex flex-col gap-2">
+                    {specialSkillsItems.map(item => (
+                      <div key={item.id} className="flex items-start gap-1.5">
+                        <div className="flex-1 min-w-0">
+                          <EntryNote
+                            label=""
+                            addLabel="Add special skill"
+                            value={item.value}
+                            editing={editingNoteIds.has(item.id)}
+                            onChange={v => updateNoteItem(setSpecialSkillsItems, item.id, v)}
+                            onStartEdit={() => startNoteEdit(item.id)}
+                            onStopEdit={() => stopNoteEdit(item.id)}
+                          />
+                        </div>
+                        <button
+                          onClick={() => removeNoteItem(setSpecialSkillsItems, item.id)}
+                          title="Remove"
+                          className="shrink-0 mt-0.5 -m-1 p-1 rounded-full text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                    <AddButton label="Add special skill" onClick={() => addNoteItem(setSpecialSkillsItems, 'ss')} />
+                  </div>
+                </div>
               </div>
 
             </div>
@@ -1484,10 +1865,10 @@ Wir bieten:
         </div>
 
         {/* ══ RIGHT BAR: Positions & Contact History — compact vertical sidebar ══ */}
-        <aside className={`w-60 shrink-0 bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col ${splitMode ? 'h-full' : ''}`}>
+        <aside className="w-60 shrink-0 bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full">
           <div
-            className={`px-4 py-4 flex flex-col gap-4 ${splitMode ? 'overflow-y-auto' : ''}`}
-            style={splitMode ? scrollFadeStyle : undefined}
+            className="px-4 py-4 flex flex-col gap-4 overflow-y-auto"
+            style={scrollFadeStyle}
           >
 
           {/* Positions the candidate applied for / is considered for */}
@@ -1515,9 +1896,20 @@ Wir bieten:
                           </svg>
                         )}
                       </span>
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${APPLIED_POSITION_STATUS[p.status].className}`}>
-                        {APPLIED_POSITION_STATUS[p.status].label}
-                      </span>
+                      <div className="relative" onClick={e => e.stopPropagation()}>
+                        <select
+                          value={p.status}
+                          onChange={e => updatePositionStatus(p.id, e.target.value as AppliedPositionStatus)}
+                          className={`appearance-none cursor-pointer pl-1.5 pr-5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-200 ${APPLIED_POSITION_STATUS[p.status].className}`}
+                        >
+                          {(Object.keys(APPLIED_POSITION_STATUS) as AppliedPositionStatus[]).map(k => (
+                            <option key={k} value={k}>{APPLIED_POSITION_STATUS[k].label}</option>
+                          ))}
+                        </select>
+                        <svg className="w-2.5 h-2.5 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1527,54 +1919,138 @@ Wir bieten:
 
           <div className="h-px bg-gray-100" />
 
-          {/* Contact history timeline — oldest → newest, connected dots */}
+          {/* Contact history timeline — latest at top, oldest at bottom */}
           <div className="flex flex-col gap-2">
-            <Label compact>Contact History</Label>
-            <ol className="relative flex flex-col gap-4 pl-7">
-              <span
-                aria-hidden
-                className="absolute left-[7px] top-1.5 bottom-2 w-[2px] rounded-full"
-                style={{ background: 'linear-gradient(to bottom, #6366f1 0%, rgba(99,102,241,0.45) 60%, rgba(99,102,241,0.12) 100%)' }}
-              />
-              {contactPoints.map(cp => {
-                const meta = CONTACT_META[cp.type];
-                const which = cp.type === 'sophia_call' ? 'sophia'
-                  : cp.type === 'whatsapp' ? 'whatsapp'
-                  : cp.type === 'hr_call' ? 'hr'
-                  : null;
-                return (
-                  <li key={cp.id} className="relative">
-                    <span className={`absolute -left-7 top-0.5 w-4 h-4 rounded-full border-2 bg-white flex items-center justify-center ${meta.ring}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
-                    </span>
-                    {which ? (
-                      <button onClick={() => openCard(which)} className="group text-left w-full" title={`Open ${meta.label}`}>
-                        <div className="flex items-center gap-1.5">
-                          <svg className="w-3.5 h-3.5 text-gray-400 shrink-0 group-hover:text-indigo-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            {meta.icon}
-                          </svg>
-                          <p className="text-[12px] font-medium text-gray-800 leading-tight group-hover:text-indigo-600 transition-colors">{meta.label}</p>
-                        </div>
-                        <p className="text-[11px] text-gray-400 mt-0.5 tabular-nums">
-                          {formatDay(cp.at)} · {formatTimeOfDay(cp.at)}
-                        </p>
+            <div className="flex items-center justify-between">
+              <Label compact>Contact History</Label>
+              <div className="relative">
+                <button
+                  onClick={() => setAddMenuOpen(o => !o)}
+                  title="Add to contact history"
+                  className={`-m-1 p-1 rounded-full transition-colors ${addMenuOpen ? 'text-gray-700 bg-gray-100' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+                {addMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setAddMenuOpen(false)} />
+                    <div className="absolute right-0 top-full mt-1 z-50 w-44 bg-white border border-gray-200 rounded-lg shadow-lg py-1 flex flex-col">
+                      <button
+                        disabled={verdictPresent}
+                        onClick={() => { setVerdictPresent(true); setAddMenuOpen(false); }}
+                        className="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 text-left disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5 shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3 3v1.5M3 21v-6m0 0l2.77-.693a9 9 0 016.208.682l.108.054a9 9 0 006.086.71l3.114-.732a48.524 48.524 0 01-.005-10.499l-3.11.732a9 9 0 01-6.085-.711l-.108-.054a9 9 0 00-6.208-.682L3 4.5M3 15V4.5" />
+                        </svg>
+                        Final Verdict
                       </button>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-1.5">
-                          <svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            {meta.icon}
-                          </svg>
-                          <p className="text-[12px] font-medium text-gray-800 leading-tight">{meta.label}</p>
-                        </div>
-                        <p className="text-[11px] text-gray-400 mt-0.5 tabular-nums">
-                          {formatDay(cp.at)} · {formatTimeOfDay(cp.at)}
-                        </p>
-                      </>
-                    )}
-                  </li>
-                );
-              })}
+                      <button
+                        disabled={documentsPresent}
+                        onClick={() => { setDocumentsPresent(true); setAddMenuOpen(false); }}
+                        className="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 text-left disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5 shrink-0 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                        </svg>
+                        CV &amp; Documents
+                      </button>
+                      <button
+                        onClick={() => { addHrCall(); setAddMenuOpen(false); }}
+                        className="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 text-left transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5 shrink-0 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {CONTACT_META.hr_call.icon}
+                        </svg>
+                        HR-Team Call
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            <ol className="relative flex flex-col gap-4 pl-7">
+              {/* 1 — Final Verdict (top of timeline) */}
+              {verdictPresent && (
+              <li className="relative group">
+                <span aria-hidden className="absolute left-[-21px] top-[8px] h-[calc(100%+1rem)] w-[2px] rounded-full bg-gray-300" />
+                <span className={`absolute -left-7 top-0 w-4 h-4 rounded-full border-2 border-amber-500 bg-white flex items-center justify-center ${verdictOpen ? 'shadow-[0_0_0_3px_rgba(245,158,11,0.18)]' : ''}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                </span>
+                <button
+                  onClick={() => { setVerdictPresent(false); setVerdictOpen(false); }}
+                  title="Remove Final Verdict"
+                  className="absolute top-0 right-0 z-10 p-1 rounded-full text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 transition-all"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <button onClick={() => openCard('verdict')} className="group text-left w-full" title="Open Final Verdict">
+                  <div className="flex items-center gap-1.5">
+                    <svg className={`w-3.5 h-3.5 shrink-0 transition-colors ${verdictOpen ? 'text-amber-600' : 'text-gray-400 group-hover:text-amber-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M3 3v1.5M3 21v-6m0 0l2.77-.693a9 9 0 016.208.682l.108.054a9 9 0 006.086.71l3.114-.732a48.524 48.524 0 01-.005-10.499l-3.11.732a9 9 0 01-6.085-.711l-.108-.054a9 9 0 00-6.208-.682L3 4.5M3 15V4.5" />
+                    </svg>
+                    <p className={`text-[12px] font-semibold leading-tight transition-colors ${verdictOpen ? 'text-amber-600' : 'text-gray-800 group-hover:text-amber-600'}`}>Final Verdict</p>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-0.5 tabular-nums">
+                    {verdictMatchedAt ? `${formatTimeOfDay(verdictMatchedAt)} · ${formatDay(verdictMatchedAt)}` : 'Pending'}
+                  </p>
+                </button>
+              </li>
+              )}
+              {/* 2 — HR-Team calls */}
+              {contactPoints.filter(cp => cp.type === 'hr_call').map(renderContactNode)}
+              {/* 3 — CV & Documents (email) */}
+              {documentsPresent && (
+              <li className="relative group">
+                <span aria-hidden className="absolute left-[-21px] top-[8px] h-[calc(100%+1rem)] w-[2px] rounded-full bg-gray-300" />
+                <span className={`absolute -left-7 top-0 w-4 h-4 rounded-full border-2 border-red-500 bg-white flex items-center justify-center ${docsOpen ? 'shadow-[0_0_0_3px_rgba(239,68,68,0.18)]' : ''}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                </span>
+                <button
+                  onClick={() => { setDocumentsPresent(false); setDocsOpen(false); }}
+                  title="Remove CV & Documents"
+                  className="absolute top-0 right-0 z-10 p-1 rounded-full text-gray-300 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 transition-all"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <button onClick={() => openCard('documents')} className="group text-left w-full" title="Open CV & Documents">
+                  <div className="flex items-center gap-1.5">
+                    <svg className={`w-3.5 h-3.5 shrink-0 transition-colors ${docsOpen ? 'text-red-600' : 'text-gray-400 group-hover:text-red-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                    </svg>
+                    <p className={`text-[12px] font-medium leading-tight transition-colors ${docsOpen ? 'text-red-600' : 'text-gray-800 group-hover:text-red-600'}`}>CV &amp; Documents</p>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-0.5 tabular-nums">{formatTimeOfDay(candidate.createdAt)} · {formatDay(candidate.createdAt)}</p>
+                </button>
+              </li>
+              )}
+              {/* 4 — Sophia calls */}
+              {contactPoints.filter(cp => cp.type === 'sophia_call').map(renderContactNode)}
+              {/* 5 — WhatsApp messages */}
+              {contactPoints.filter(cp => cp.type === 'whatsapp').map(renderContactNode)}
+              {/* 6 — Instant Forms: the candidate's first submission via the Meta lead ad (bottom, no connector) */}
+              <li className="relative">
+                <span className={`absolute -left-7 top-0 w-4 h-4 rounded-full border-2 border-yellow-500 bg-white flex items-center justify-center ${instantOpen ? 'shadow-[0_0_0_3px_rgba(234,179,8,0.18)]' : ''}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
+                </span>
+                <button onClick={() => openCard('instant')} className="group text-left w-full" title="Open Instant Form submission">
+                  <div className="flex items-center gap-1.5">
+                    <svg className={`w-3.5 h-3.5 shrink-0 transition-colors ${instantOpen ? 'text-yellow-600' : 'text-gray-400 group-hover:text-yellow-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M7.5 3.75h9a1.5 1.5 0 011.5 1.5v13.5a1.5 1.5 0 01-1.5 1.5h-9a1.5 1.5 0 01-1.5-1.5V5.25a1.5 1.5 0 011.5-1.5zM9 8.25h6M9 12h6M9 15.75h3.75" />
+                    </svg>
+                    <p className={`text-[12px] font-medium leading-tight transition-colors ${instantOpen ? 'text-yellow-600' : 'text-gray-800 group-hover:text-yellow-600'}`}>Instant Forms</p>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-0.5 tabular-nums">
+                    {formatTimeOfDay(candidate.createdAt)} · {formatDay(candidate.createdAt)}
+                  </p>
+                </button>
+              </li>
             </ol>
           </div>
           </div>
@@ -1582,9 +2058,28 @@ Wir bieten:
 
         </div>
 
-        {/* ══ Bottom: the selected channel card (~44% height) ══ */}
+        {/* Drag handle — extend or reduce the opened window vs the top section */}
         {splitMode && (
-        <div className="flex-[11] min-h-0">
+        <div
+          onMouseDown={startWindowResize}
+          onKeyDown={onWindowHandleKey}
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize window"
+          aria-valuenow={Math.round(windowRatio * 100)}
+          aria-valuemin={20}
+          aria-valuemax={80}
+          tabIndex={0}
+          title="Drag to resize"
+          className="group/wresize shrink-0 h-2.5 cursor-row-resize focus:outline-none flex items-center justify-center"
+        >
+          <span className={`h-px w-10 rounded-full transition-colors ${windowResizing ? 'bg-gray-400' : 'bg-gray-200 group-hover/wresize:bg-gray-400 group-focus-visible/wresize:bg-indigo-400'}`} />
+        </div>
+        )}
+
+        {/* ══ Bottom: the opened contact-history window (resizable height) ══ */}
+        {splitMode && (
+        <div className="min-h-0" style={{ flexGrow: windowRatio, flexShrink: 1, flexBasis: 0 }}>
 
         {/* ══ Sophia Call card — shown when its contact-history link is clicked ══ */}
         {sophiaOpen && (
@@ -1592,6 +2087,9 @@ Wir bieten:
           id="card-sophia"
           onClose={() => setSophiaOpen(false)}
           headerLabel="Sophia Call"
+          headerIcon={CONTACT_META.sophia_call.icon}
+          headerColor="text-indigo-600"
+          titleHeading="Sophia evaluation"
           info={infoFields}
           initialTitle={candidate.transcriptSummary ?? ''}
           headerMeta={
@@ -1671,38 +2169,40 @@ Wir bieten:
 
         {/* ══ WhatsApp card — shown when its contact-history link is clicked ══ */}
         {whatsappOpen && (
-        <ChannelCard id="card-whatsapp" onClose={() => setWhatsappOpen(false)} headerLabel="WhatsApp" noteTaker noteAddLabel="Add impression">
-          {/* Messages */}
-          <div className="px-4 py-3 overflow-y-auto flex-1 flex flex-col gap-2 bg-[#efeae2]/40" style={scrollFadeStyle}>
-            {waMessages.map((m, i) => (
-              <div key={i} className={`flex ${m.from === 'us' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[75%] px-2.5 py-1.5 rounded-lg text-xs leading-relaxed shadow-sm ${
-                  m.from === 'us' ? 'bg-[#d9fdd3] text-gray-800 rounded-tr-sm' : 'bg-white text-gray-800 rounded-tl-sm'
-                }`}>
-                  {m.text}
-                  <span className="block text-[9px] text-gray-400 text-right mt-0.5">{m.time}</span>
+        <ChannelCard id="card-whatsapp" onClose={() => setWhatsappOpen(false)} headerLabel="WhatsApp Message" headerIcon={CONTACT_META.whatsapp.icon} headerColor="text-emerald-600" titleHeading="WhatsApp evaluation" noteTaker noteAddLabel="Add evaluation">
+          {/* Messages + floating composer — messages scroll behind the transparent composer */}
+          <div className="relative flex-1 min-h-0">
+            <div className="h-full overflow-y-auto px-4 pt-3 pb-16 flex flex-col gap-2 bg-[#efeae2]/40" style={scrollFadeStyle}>
+              {waMessages.map((m, i) => (
+                <div key={i} className={`flex ${m.from === 'us' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[75%] px-2.5 py-1.5 rounded-lg text-xs leading-relaxed shadow-sm ${
+                    m.from === 'us' ? 'bg-[#d9fdd3] text-gray-800 rounded-tr-sm' : 'bg-white text-gray-800 rounded-tl-sm'
+                  }`}>
+                    {m.text}
+                    <span className="block text-[9px] text-gray-400 text-right mt-0.5">{m.time}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-          {/* Composer */}
-          <div className="shrink-0 border-t border-gray-100 px-3 py-2.5 flex items-center gap-2 bg-white">
-            <input
-              value={waDraft}
-              onChange={e => setWaDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') sendWa(); }}
-              placeholder="Type a message…"
-              className="flex-1 min-w-0 h-9 px-3.5 text-xs text-gray-800 bg-gray-100 rounded-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-emerald-300 placeholder-gray-400"
-            />
-            <button
-              onClick={sendWa}
-              title="Send"
-              className="shrink-0 w-9 h-9 rounded-full bg-[#25d366] hover:bg-[#1ebe5d] text-white flex items-center justify-center transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 12L3.27 3.13A59.77 59.77 0 0121.49 12 59.77 59.77 0 013.27 20.88L6 12zm0 0h7.5" />
-              </svg>
-            </button>
+              ))}
+            </div>
+            {/* Composer — transparent overlay, no background, so messages show through behind it */}
+            <div className="absolute bottom-0 inset-x-0 px-3 py-2.5 flex items-center gap-2">
+              <input
+                value={waDraft}
+                onChange={e => setWaDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') sendWa(); }}
+                placeholder="Type a message…"
+                className="flex-1 min-w-0 h-9 px-3.5 text-xs text-gray-800 bg-gray-100 rounded-full focus:outline-none focus:bg-white focus:ring-1 focus:ring-emerald-300 placeholder-gray-400"
+              />
+              <button
+                onClick={sendWa}
+                title="Send"
+                className="shrink-0 w-9 h-9 rounded-full bg-[#25d366] hover:bg-[#1ebe5d] text-white flex items-center justify-center transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 12L3.27 3.13A59.77 59.77 0 0121.49 12 59.77 59.77 0 013.27 20.88L6 12zm0 0h7.5" />
+                </svg>
+              </button>
+            </div>
           </div>
         </ChannelCard>
         )}
@@ -1712,11 +2212,166 @@ Wir bieten:
         <ChannelCard
           id="card-hr"
           onClose={() => setHrOpen(false)}
-          headerLabel="HR-Team"
-          impressionLabel="Wandel Impression"
+          headerLabel="HR-Team Call"
+          headerIcon={CONTACT_META.hr_call.icon}
+          headerColor="text-sky-600"
+          impressionLabel="Impression"
         >
           <HrTeamLeft />
         </ChannelCard>
+        )}
+
+        {/* ══ Final Verdict — match evaluation (left 75%) + accept/match decision (right 25%) ══ */}
+        {verdictOpen && (
+          <VerdictCard
+            onClose={() => setVerdictOpen(false)}
+            onAccept={() => {
+              const targetId = selectedPos?.id
+                ?? appliedPositions.find(p => p.title === candidate.jobTitle)?.id
+                ?? appliedPositions[0]?.id;
+              if (targetId) updatePositionStatus(targetId, 'matched');
+              setVerdictMatchedAt(new Date().toISOString());
+            }}
+            positionTitle={selectedPos?.title ?? candidate.jobTitle}
+            candidateName={candidate.firstName}
+          />
+        )}
+
+        {/* ══ CV & Documents — master/detail: list (left 25%) | viewer (right 75%, only when a doc is open) ══ */}
+        {docsOpen && (
+        <div id="card-documents" className="relative scroll-mt-4 bg-white border border-gray-200 rounded-xl overflow-hidden flex h-full">
+
+          {/* Left: document list (full width until a doc is selected, then 25%) */}
+          <div className={`flex flex-col min-w-0 overflow-hidden ${openDoc ? 'basis-1/4 shrink-0 border-r border-gray-100' : 'flex-1'}`}>
+            <div className="px-4 h-12 flex items-center gap-2 bg-gray-50/80 border-b border-gray-100 shrink-0">
+              <svg className="w-4 h-4 shrink-0 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+              </svg>
+              <p className="text-[11px] font-semibold text-red-600 uppercase tracking-wider truncate">CV &amp; Documents</p>
+              {!openDoc && (
+              <button
+                onClick={() => { setDocsOpen(false); setOpenDoc(null); }}
+                title="Close"
+                className="ml-auto -m-1 p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              )}
+            </div>
+            <div className="px-3 py-3 flex-1 overflow-y-auto flex flex-col gap-2" style={scrollFadeStyle}>
+              {documents.map(doc => {
+                const active = openDoc?.name === doc.name;
+                return (
+                  <button
+                    key={doc.name}
+                    onClick={() => setOpenDoc(doc)}
+                    title={`Open ${doc.name}`}
+                    className={`group flex items-center gap-2.5 px-3 py-2.5 border border-gray-200 rounded-lg text-left transition-colors ${
+                      active ? 'bg-indigo-100' : 'hover:bg-indigo-50/50'
+                    }`}
+                  >
+                    <svg className={`w-4 h-4 shrink-0 transition-colors ${active ? 'text-indigo-600' : 'text-gray-400 group-hover:text-indigo-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className={`text-sm truncate flex-1 transition-colors ${active ? 'text-indigo-700 font-medium' : 'text-gray-700 group-hover:text-indigo-600'}`}>{doc.name}</span>
+                  </button>
+                );
+              })}
+              {/* Upload a new document */}
+              <button
+                onClick={() => docInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-500 border border-dashed border-gray-300 rounded-lg hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50/50 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                </svg>
+                Upload document
+              </button>
+              <input ref={docInputRef} type="file" className="hidden" onChange={handleUploadDocument} multiple />
+            </div>
+          </div>
+
+          {/* Right: viewer (75%) — only once a document is selected */}
+          {openDoc && (
+          <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+            <div className="px-5 h-12 flex items-center gap-2 bg-gray-50/80 border-b border-gray-100 shrink-0">
+              <svg className="w-4 h-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p className="text-sm font-medium text-gray-800 truncate">{openDoc.name}</p>
+              <button
+                onClick={() => { setDocsOpen(false); setOpenDoc(null); }}
+                title="Close"
+                className="ml-auto -m-1 p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center gap-3 bg-gray-50/50 text-center px-6">
+              <svg className="w-14 h-14 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p className="text-sm text-gray-500">{openDoc.name}</p>
+              <a
+                href={openDoc.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-medium text-red-600 hover:underline"
+              >
+                Open original ↗
+              </a>
+            </div>
+          </div>
+          )}
+
+        </div>
+        )}
+
+        {/* ══ Instant Form card — single panel (no split): submitted Meta-ad details ══ */}
+        {instantOpen && (
+        <div id="card-instant" className="relative scroll-mt-4 bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full">
+          {/* Header: notepad icon + source label + close */}
+          <div className="px-5 h-12 flex items-center gap-2.5 bg-gray-50/80 border-b border-gray-100 shrink-0">
+            <svg className="w-4 h-4 shrink-0 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M7.5 3.75h9a1.5 1.5 0 011.5 1.5v13.5a1.5 1.5 0 01-1.5 1.5h-9a1.5 1.5 0 01-1.5-1.5V5.25a1.5 1.5 0 011.5-1.5zM9 8.25h6M9 12h6M9 15.75h3.75" />
+            </svg>
+            <p className="text-[11px] font-semibold text-yellow-600 uppercase tracking-wider">
+              Submitted via Meta Lead Ad{candidate.source ? ` · ${candidate.source.charAt(0).toUpperCase() + candidate.source.slice(1)}` : ''}
+            </p>
+            <button
+              onClick={() => setInstantOpen(false)}
+              title="Close"
+              className="ml-auto -m-1 p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          {/* Body: full-width submitted fields */}
+          <div className="px-5 py-5 flex-1 overflow-y-auto" style={scrollFadeStyle}>
+            <div className="grid grid-cols-3 gap-x-8 gap-y-5">
+              {[
+                { label: 'First Name', value: candidate.firstName },
+                { label: 'Last Name', value: candidate.lastName },
+                { label: 'Phone', value: candidate.phoneNumber },
+                { label: 'Email', value: candidate.email },
+                { label: 'City', value: candidate.city },
+                { label: 'Position of Interest', value: candidate.jobTitle },
+                { label: 'Submitted', value: formatDay(candidate.createdAt) },
+              ].map(f => (
+                <div key={f.label} className="min-w-0 flex flex-col gap-1">
+                  <Label compact>{f.label}</Label>
+                  <p className="text-sm text-gray-800 break-words">{f.value || '—'}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
         )}
 
         </div>

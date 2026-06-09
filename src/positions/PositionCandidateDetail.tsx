@@ -1,8 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { mockCandidates, mockPositions } from '../mockData';
-import ProfileFactsRail from './profiles/ProfileFactsRail';
-import ProfileAssessmentHero from './profiles/ProfileAssessmentHero';
-import ProfileThreeColumn from './profiles/ProfileThreeColumn';
+import { mockCandidates, mockPositions } from '../data/mockData';
+import ProfileFactsRail from './components/profile/ProfileFactsRail';
+import ProfileAssessmentHero from './components/profile/ProfileAssessmentHero';
+import ProfileThreeColumn from './components/profile/ProfileThreeColumn';
 
 /* Each of the first three candidates gets its own profile design. */
 const PROFILE_BY_ID: Record<string, typeof ProfileFactsRail> = {
