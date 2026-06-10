@@ -699,7 +699,9 @@ function compSortValue(r: CompRow, key: CompSortKey): number | string {
   }
 }
 
-const COMP_COLS = 'grid-cols-[1.8fr_1fr_1.15fr_0.95fr_1fr_0.85fr_1.05fr_0.55fr_0.6fr]';
+/* Content-sized columns: every column hugs its content, only Candidate flexes —
+   so the gutter between any two columns is exactly the uniform grid gap. */
+const COMP_COLS = 'grid-cols-[minmax(190px,1fr)_120px_130px_95px_100px_95px_130px_56px_90px]';
 
 function ComparisonView({ position }: { position: Position }) {
   const navigate = useNavigate();
@@ -756,9 +758,9 @@ function ComparisonView({ position }: { position: Position }) {
         </div>
 
         <div className="overflow-x-auto">
-          <div className="min-w-[1080px]">
+          <div className="min-w-[1180px]">
             {/* Header */}
-            <div className={`grid ${COMP_COLS} gap-3 items-center px-5 py-2.5 text-[9.5px] font-semibold text-slate-500 border-b border-white/[0.06]`}>
+            <div className={`grid ${COMP_COLS} gap-4 items-center px-5 py-2.5 text-[9.5px] font-semibold text-slate-500 border-b border-white/[0.06]`}>
               <SortHeader label="Candidate" k="name" title="Sort alphabetically" />
               <SortHeader label="Must-haves" k="must" title="Knock-out criteria from the job description — sorted by number of criteria met" />
               <SortHeader label="Experience" k="experience" title="Relevant field-service experience — scored from CV and Sophia call" />
@@ -778,7 +780,7 @@ function ComparisonView({ position }: { position: Position }) {
               return (
                 <div key={r.id} className="border-b border-white/[0.05] last:border-b-0">
                   <div className="hover:bg-white/[0.035] transition-colors">
-                    <div className={`grid ${COMP_COLS} gap-3 items-center px-5 py-3`}>
+                    <div className={`grid ${COMP_COLS} gap-4 items-center px-5 py-3`}>
                       {/* Candidate — identity from the talent store */}
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500/40 to-violet-500/40 border border-white/15 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
@@ -829,12 +831,6 @@ function ComparisonView({ position }: { position: Position }) {
           </div>
         </div>
       </div>
-
-      {/* Legend */}
-      <p className="text-[10.5px] text-slate-500 px-1">
-        Must-haves from the job description (✓ met · – partially · ✕ not met).
-        Experience from CV &amp; Sophia call (0–10) · German per CEFR (A1–C2 / native), assessed in the call. Budget: {COMP_BUDGET.toLocaleString('de-DE')} € after probation.
-      </p>
     </div>
   );
 }
