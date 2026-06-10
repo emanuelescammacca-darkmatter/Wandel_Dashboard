@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import wandelLogo from '../../../assets/wandel-logo.png';
 import type { Candidate } from '../../../types';
 import { CARD_GRADIENT } from '../../../constants/theme';
-import { ChannelIcon } from '../../../components/ChannelBadge';
+import CvDocument from './CvDocument';
 import {
   ageFromDob, formatDate, formatSalary, driversLicenseLabel, initials,
   EDUCATION_TYPE_LABEL, BackLink, Icons, Glyph,
@@ -10,16 +10,22 @@ import {
 
 /* ── Design A — "Nova": dark page + top bar, light gradient body cards ── */
 
-const EMPLOYMENT_LABEL: Record<string, string> = {
-  'looking-for-job': 'Looking for a job',
-  employed: 'Employed',
-  unemployed: 'Unemployed',
-  applying: 'Applying',
-  'interview-scheduled': 'Interview scheduled',
-  'not-interested': 'Not interested',
-};
-
 const WANDEL_INDIGO = 'brightness(0) saturate(100%) invert(57%) sepia(73%) saturate(1752%) hue-rotate(213deg) brightness(99%) contrast(96%)';
+
+/* Same categories as the Candidate Pipeline board on the Dashboard. */
+const EVAL_CATEGORIES: { key: string; label: string; accent: string }[] = [
+  { key: 'rejected', label: 'Rejected', accent: '#ef4444' },
+  { key: 'new', label: 'New', accent: '#3b82f6' },
+  { key: 'shortlist', label: 'Shortlisted', accent: '#6366f1' },
+  { key: 'interview', label: 'Interviewing', accent: '#a855f7' },
+  { key: 'offer', label: 'Offer Extended', accent: '#f59e0b' },
+  { key: 'hired', label: 'Hired', accent: '#16a34a' },
+];
+
+/* Mock process meta — mirrors the Comparison scores until wired to real data. */
+const MATCH_BY_ID: Record<string, number> = { '1': 84, '2': 92, '3': 38, '4': 59, '5': 67, '6': 48, '7': 87, '8': 76 };
+const DAYS_IN_STAGE_BY_ID: Record<string, number> = { '1': 6, '2': 2, '3': 11, '4': 4, '5': 3, '6': 8, '7': 1, '8': 5 };
+const matchTone = (v: number) => (v >= 80 ? '#34d399' : v >= 60 ? '#fbbf24' : '#fb7185');
 
 /* Dark glass panel (top bar). */
 function GlassPanel({ className = '', style, children }: { className?: string; style?: React.CSSProperties; children: React.ReactNode }) {
@@ -49,21 +55,35 @@ function FactRow({ icon, label, value }: { icon: React.ReactNode; label: string;
         <Glyph className="w-4 h-4">{icon}</Glyph>
       </span>
       <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-[0.12em] text-[#94a3b8]">{label}</p>
+        <p className="text-[10px] uppercase tracking-[0.12em] font-medium text-[#64748b]">{label}</p>
         <div className="text-[13px] text-[#0f172a] mt-0.5 break-words">{value ?? <span className="text-[#cbd5e1]">—</span>}</div>
       </div>
     </div>
   );
 }
 
-const RAIL_LABEL = 'text-[10px] uppercase tracking-[0.16em] text-[#94a3b8]';
+const RAIL_LABEL = 'text-[11px] uppercase tracking-[0.16em] font-semibold text-[#475569]';
 
 export default function ProfileFactsRail({ candidate, onBack, backLabel }: { candidate: Candidate; onBack: () => void; backLabel: string }) {
   const age = ageFromDob(candidate.dateOfBirth);
   const [notes, setNotes] = useState('');
   const [saved, setSaved] = useState(false);
   const [flipped, setFlipped] = useState(false);
+  const [evalOpen, setEvalOpen] = useState(false);
+  const [evalKey, setEvalKey] = useState<string>('new');
+  const [cvOpen, setCvOpen] = useState(false);
   const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
+
+  const evalRef = useRef<HTMLDivElement>(null);
+  const activeEval = EVAL_CATEGORIES.find(c => c.key === evalKey) ?? EVAL_CATEGORIES[1];
+  useEffect(() => {
+    if (!evalOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (evalRef.current && !evalRef.current.contains(e.target as Node)) setEvalOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [evalOpen]);
 
   const germanPill = candidate.germanLevel ? (
     <span className="inline-block text-[11px] px-2 py-0.5 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 font-medium">{candidate.germanLevel}</span>
@@ -97,8 +117,10 @@ export default function ProfileFactsRail({ candidate, onBack, backLabel }: { can
         <BackLink label={backLabel} onClick={onBack} tone="dark" />
 
         {/* ══ Top bar ══ */}
-        <GlassPanel className="mt-5 relative overflow-hidden px-6 py-4">
-          <div className="absolute -top-20 -right-10 w-64 h-64 rounded-full blur-3xl pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(129,140,248,0.22), transparent 70%)' }} />
+        <GlassPanel className="mt-5 relative z-30 px-6 py-4">
+          <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
+            <div className="absolute -top-20 -right-10 w-64 h-64 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle, rgba(129,140,248,0.22), transparent 70%)' }} />
+          </div>
           <div className="relative flex items-center gap-4 flex-wrap">
             <div className="p-[2px] rounded-xl bg-gradient-to-br from-indigo-400 via-violet-400 to-cyan-300 shrink-0 shadow-[0_0_22px_rgba(129,140,248,0.4)]">
               <div className="w-12 h-12 rounded-xl bg-[#0c1330] flex items-center justify-center text-base font-semibold text-white">
@@ -112,23 +134,73 @@ export default function ProfileFactsRail({ candidate, onBack, backLabel }: { can
               <p className="text-sm text-slate-400 mt-0.5">{candidate.jobTitle}</p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/30 text-emerald-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.85)]" />
-                {EMPLOYMENT_LABEL[candidate.employmentStatus] ?? candidate.employmentStatus}
+              <span
+                className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border text-slate-200"
+                style={{ background: `${activeEval.accent}1f`, borderColor: `${activeEval.accent}59` }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: activeEval.accent, boxShadow: `0 0 8px ${activeEval.accent}` }} />
+                {activeEval.label}
+                <span className="text-slate-400 font-normal">· {DAYS_IN_STAGE_BY_ID[candidate.id] ?? 3}d</span>
               </span>
-              <span className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/10 text-slate-300">
-                <ChannelIcon channel={candidate.source} />
-                <span className="capitalize">{candidate.source}</span>
-              </span>
+              {(() => {
+                const score = MATCH_BY_ID[candidate.id] ?? 72;
+                const tone = matchTone(score);
+                return (
+                  <span
+                    title="Match-Score zur Position"
+                    className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border text-slate-200"
+                    style={{ background: `${tone}1a`, borderColor: `${tone}4d` }}
+                  >
+                    Match <span className="font-bold tabular-nums" style={{ color: tone }}>{score}</span>
+                  </span>
+                );
+              })()}
+              {candidate.lastContactAt && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400 pl-1" title="Letzter Kontakt">
+                  <svg className="w-3.5 h-3.5 text-indigo-300/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 6l1.8 4.2L18 12l-4.2 1.8L12 18l-1.8-4.2L6 12l4.2-1.8L12 6z" /></svg>
+                  Sophia-Call · {formatDate(candidate.lastContactAt)}
+                </span>
+              )}
             </div>
 
             {/* Far-right actions */}
             <div className="ml-auto flex items-center gap-3">
-              <button className="inline-flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-lg border border-indigo-400/30 bg-indigo-400/10 text-indigo-200 hover:bg-indigo-400/20 transition-colors">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3z" /></svg>
-                Evaluate Candidate
-              </button>
-              <button className="inline-flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-lg border border-white/15 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08] hover:border-white/25 transition-colors">
+              <div ref={evalRef} className="relative">
+                <button
+                  onClick={() => setEvalOpen(o => !o)}
+                  className="inline-flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-lg border border-indigo-400/30 bg-indigo-400/10 text-indigo-200 hover:bg-indigo-400/20 transition-colors"
+                >
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><path d="M12 6l1.8 4.2L18 12l-4.2 1.8L12 18l-1.8-4.2L6 12l4.2-1.8L12 6z" /></svg>
+                  Evaluate Candidate
+                  <svg className={`w-3.5 h-3.5 transition-transform ${evalOpen ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+                </button>
+                {evalOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-56 z-30 rounded-xl border border-white/10 bg-[#0c1330]/95 backdrop-blur-xl shadow-[0_16px_40px_rgba(0,0,0,0.5)] p-1.5">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500 px-2.5 pt-1.5 pb-1">Move to stage</p>
+                    {EVAL_CATEGORIES.map(cat => {
+                      const active = cat.key === evalKey;
+                      return (
+                        <button
+                          key={cat.key}
+                          onClick={() => { setEvalKey(cat.key); setEvalOpen(false); }}
+                          className="w-full flex items-center gap-2.5 text-[13px] px-2.5 py-2 rounded-lg transition-colors hover:bg-white/[0.06]"
+                          style={active ? { background: `${cat.accent}1f` } : undefined}
+                        >
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cat.accent, boxShadow: active ? `0 0 8px ${cat.accent}` : undefined }} />
+                          <span className={active ? 'font-semibold text-white' : 'text-slate-300'}>{cat.label}</span>
+                          {active && (
+                            <svg className="w-4 h-4 ml-auto text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setCvOpen(true)}
+                className="inline-flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-lg border border-white/15 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08] hover:border-white/25 transition-colors"
+              >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v11m0 0l-4-4m4 4l4-4M5 19h14" /></svg>
                 Download CV
               </button>
@@ -212,6 +284,16 @@ export default function ProfileFactsRail({ candidate, onBack, backLabel }: { can
                         </button>
                       </div>
                       <p className="text-[15px] leading-relaxed text-[#334155]">{candidate.assessment}</p>
+
+                      {candidate.jobChangeMotivation && (
+                        <div className="mt-3 pt-2.5 border-t border-[#e6e9f2] flex items-center gap-2.5 flex-wrap">
+                          <span className="inline-flex items-center gap-1.5 shrink-0">
+                            <svg className="w-3 h-3 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M16 8l-2.5 5.5L8 16l2.5-5.5L16 8z" /></svg>
+                            <span className="text-[10px] uppercase tracking-[0.14em] font-semibold text-indigo-500 leading-none">Motivation to change</span>
+                          </span>
+                          <p className="text-[13px] text-[#475569] leading-snug min-w-0 flex-1">{candidate.jobChangeMotivation}</p>
+                        </div>
+                      )}
                     </div>
                   </Card>
                 </div>
@@ -237,17 +319,11 @@ export default function ProfileFactsRail({ candidate, onBack, backLabel }: { can
                         </svg>
                       </button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
                       {(candidate.clientQuestions ?? []).map((q, i) => (
                         <div key={i}>
-                          <div className="flex gap-2.5">
-                            <span className="w-5 h-5 rounded-md bg-cyan-50 border border-cyan-200 text-cyan-700 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">Q</span>
-                            <p className="text-[13px] font-medium text-[#0f172a]">{q.question}</p>
-                          </div>
-                          <div className="flex gap-2.5 mt-2">
-                            <span className="w-5 h-5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">A</span>
-                            <p className="text-[13px] text-[#475569] leading-relaxed">{q.answer}</p>
-                          </div>
+                          <p className="text-[13px] font-semibold text-[#0f172a] leading-snug">{q.question}</p>
+                          <blockquote className="mt-2.5 border-l-2 border-indigo-300 pl-3.5 text-[13px] text-[#475569] leading-relaxed">{q.answer}</blockquote>
                         </div>
                       ))}
                     </div>
@@ -267,13 +343,16 @@ export default function ProfileFactsRail({ candidate, onBack, backLabel }: { can
                 />
                 {(candidate.experiences ?? []).map((exp, i) => (
                   <li key={i} className="relative">
-                    <span className="absolute -left-9 top-0.5 w-[22px] h-[22px] rounded-full border-2 border-indigo-500 bg-white flex items-center justify-center shadow-[0_0_0_4px_rgba(99,102,241,0.10)]">
+                    <span className="absolute -left-9 top-1 w-[22px] h-[22px] rounded-full border-2 border-indigo-500 bg-white flex items-center justify-center shadow-[0_0_0_4px_rgba(99,102,241,0.10)]">
                       <span className="w-2 h-2 rounded-full bg-indigo-500" />
                     </span>
-                    <div className="flex justify-between gap-3 flex-wrap">
-                      <p className="text-sm font-semibold text-[#0f172a]">{exp.role}</p>
-                      <span className="text-xs text-[#0891b2] font-medium tabular-nums">{exp.period}</span>
-                    </div>
+                    {exp.period && (
+                      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#0e7490] bg-cyan-50 border border-cyan-200 rounded-full px-2.5 py-0.5 tabular-nums">
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M8 2v4M16 2v4M3 10h18" /></svg>
+                        {exp.period}
+                      </span>
+                    )}
+                    <p className="text-sm font-semibold text-[#0f172a] mt-2">{exp.role}</p>
                     <p className="text-xs text-indigo-500 mt-0.5">{exp.company}{exp.location ? ` · ${exp.location}` : ''}</p>
                     <p className="text-[13px] text-[#475569] leading-relaxed mt-2">{exp.description}</p>
                   </li>
@@ -298,6 +377,8 @@ export default function ProfileFactsRail({ candidate, onBack, backLabel }: { can
           </div>
         </div>
       </div>
+
+      {cvOpen && <CvDocument candidate={candidate} onClose={() => setCvOpen(false)} />}
     </div>
   );
 }

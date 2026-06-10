@@ -1629,7 +1629,6 @@ const KSTAGES: { key: KStage; label: string; hint: string; accent: string; termi
   { key: 'hired', label: 'Hired', hint: 'Closed — won', accent: '#16a34a', terminal: true },
 ];
 const STALL_DAYS = 5; // candidates idle this long in an active stage get nudged
-const COLUMN_W = 290;
 
 type BoardCand = Cand & { stage: KStage; daysInStage: number };
 const INITIAL_BOARD: BoardCand[] = [
@@ -1646,13 +1645,14 @@ const INITIAL_BOARD: BoardCand[] = [
 const isStageTerminal = (s: KStage) => KSTAGES.find(k => k.key === s)?.terminal ?? false;
 const isStalled = (c: BoardCand) => !isStageTerminal(c.stage) && c.daysInStage >= STALL_DAYS;
 
-function PipelineBoard({ positions }: { positions: string[] }) {
+export function PipelineBoard({ positions, hideFilter = false, restrictPosition }: { positions: string[]; hideFilter?: boolean; restrictPosition?: string }) {
   const [cards, setCards] = useState<BoardCand[]>(INITIAL_BOARD);
   const [posFilter, setPosFilter] = useState<string>('all');
   const [dragId, setDragId] = useState<string | null>(null);
   const [overStage, setOverStage] = useState<KStage | null>(null);
 
-  const visible = posFilter === 'all' ? cards : cards.filter(c => c.position === posFilter);
+  const scoped = restrictPosition ? cards.filter(c => c.position === restrictPosition) : cards;
+  const visible = posFilter === 'all' ? scoped : scoped.filter(c => c.position === posFilter);
   const move = (id: string, stage: KStage) =>
     setCards(cs => cs.map(c => (c.id === id && c.stage !== stage ? { ...c, stage, daysInStage: 0 } : c)));
 
@@ -1663,19 +1663,21 @@ function PipelineBoard({ positions }: { positions: string[] }) {
     <div className="bg-transparent">
       {/* board controls: position filter + attention summary */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-        <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[#0b1330] border border-white/[0.08] flex-wrap">
-          {filters.map(f => (
-            <button
-              key={f.key}
-              onClick={() => setPosFilter(f.key)}
-              className={`text-[12px] font-medium px-3 py-1.5 rounded-lg transition-colors ${
-                posFilter === f.key ? 'bg-[#4f46e5] text-white shadow-sm' : 'text-[#94a3b8] hover:text-white hover:bg-white/5'
-              }`}
-            >
-              {f.key === 'all' ? f.label : f.label.split(' ')[0]}
-            </button>
-          ))}
-        </div>
+        {hideFilter ? <span /> : (
+          <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-[#0b1330] border border-white/[0.08] flex-wrap">
+            {filters.map(f => (
+              <button
+                key={f.key}
+                onClick={() => setPosFilter(f.key)}
+                className={`text-[12px] font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                  posFilter === f.key ? 'bg-[#4f46e5] text-white shadow-sm' : 'text-[#94a3b8] hover:text-white hover:bg-white/5'
+                }`}
+              >
+                {f.key === 'all' ? f.label : f.label.split(' ')[0]}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex items-center gap-4 text-[12px]">
           <span className="text-[#94a3b8] font-medium">{visible.length} candidates in pipeline</span>
           {stalledCount > 0 && (
@@ -1686,8 +1688,8 @@ function PipelineBoard({ positions }: { positions: string[] }) {
         </div>
       </div>
 
-      {/* columns — horizontal scroll, fixed-width Trello-style lanes */}
-      <div className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
+      {/* columns — responsive grid lanes that always fill the available width */}
+      <div className="grid gap-4 pb-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
         {KSTAGES.map(stage => {
           const items = visible.filter(c => c.stage === stage.key);
           const isOver = overStage === stage.key;
@@ -1697,9 +1699,8 @@ function PipelineBoard({ positions }: { positions: string[] }) {
               onDragOver={e => { e.preventDefault(); setOverStage(stage.key); }}
               onDragLeave={() => setOverStage(s => (s === stage.key ? null : s))}
               onDrop={() => { if (dragId) move(dragId, stage.key); setOverStage(null); setDragId(null); }}
-              className="flex-1 rounded-2xl border p-2.5 transition-all duration-150"
+              className="min-w-0 rounded-2xl border p-2.5 transition-all duration-150"
               style={{
-                minWidth: COLUMN_W,
                 borderColor: isOver ? stage.accent : 'rgba(255,255,255,0.10)',
                 background: isOver
                   ? `linear-gradient(180deg, ${stage.accent}33, rgba(11,19,48,0.65))`
