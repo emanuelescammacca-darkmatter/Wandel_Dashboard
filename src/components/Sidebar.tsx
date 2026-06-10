@@ -103,8 +103,8 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Positions - Clients',
     items: [
-      { label: 'Servicetechniker für Kaffeeautomaten', path: '/clients/positions',    icon: Icons.one },
-      { label: 'Lagerlogistiker',                      path: '/clients/positions-2',  icon: Icons.two },
+      { label: 'Servicetechniker für Kaffeeautomaten', path: '/clients/positions/p1', icon: Icons.one },
+      { label: 'Lagerlogistiker',                      path: '/clients/positions/p2', icon: Icons.two },
     ],
   },
 ];

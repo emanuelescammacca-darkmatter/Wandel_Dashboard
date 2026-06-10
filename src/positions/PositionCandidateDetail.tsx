@@ -1,22 +1,16 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { mockCandidates, mockPositions } from '../data/mockData';
 import ProfileFactsRail from './components/profile/ProfileFactsRail';
-import ProfileAssessmentHero from './components/profile/ProfileAssessmentHero';
-import ProfileThreeColumn from './components/profile/ProfileThreeColumn';
-
-/* Each of the first three candidates gets its own profile design. */
-const PROFILE_BY_ID: Record<string, typeof ProfileFactsRail> = {
-  '1': ProfileFactsRail,       // Marcel Weber  — Dossier (sticky facts rail)
-  '2': ProfileAssessmentHero,  // Andi Kufner   — Verdict (assessment hero)
-  '3': ProfileThreeColumn,     // Udo A. Brandt — Cockpit (3-column dashboard)
-};
 
 export default function PositionCandidateDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const listPath = '/clients/positions';
-  const listLabel = mockPositions[0]?.title ?? 'Position';
   const candidate = mockCandidates.find(c => c.id === id);
+
+  // Back link targets the position the candidate is matched to.
+  const position = mockPositions.find(p => p.title === candidate?.jobTitle) ?? mockPositions[0];
+  const listPath = `/clients/positions/${position?.id ?? 'p1'}`;
+  const listLabel = position?.title ?? 'Position';
 
   if (!candidate) {
     return (
@@ -29,10 +23,8 @@ export default function PositionCandidateDetail() {
     );
   }
 
-  const Profile = PROFILE_BY_ID[candidate.id] ?? ProfileFactsRail;
-
   return (
-    <Profile
+    <ProfileFactsRail
       candidate={candidate}
       onBack={() => navigate(listPath)}
       backLabel={listLabel}

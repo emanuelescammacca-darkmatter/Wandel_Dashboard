@@ -11,8 +11,11 @@ import { TALENT, STAGES, isTerminal, useStages, setStage, type Stage } from '../
    Three structural zones: dark header band · white main · off-white right rail.
    ────────────────────────────────────────────────────────────────────────── */
 
-// Current hero metrics (single snapshot — no week switching).
-const HERO_METRICS = { active: '3', growth: '24', growthDelta: '+5', ready: '3' };
+// Hero metrics — the three most important categories from the funnel + kanban:
+// new applications (funnel sourcing, this week vs. last), matched candidates
+// (funnel outcome, computed from the position funnels), and interviewing
+// (kanban stage, read live from the talent store).
+const HERO_APPLICATIONS = { value: '14', delta: '+8' };
 
 /* Channel registry — abbreviations + node colors shared across the page. */
 const CHANNELS = {
@@ -23,76 +26,28 @@ const CHANNELS = {
   metaads: { abbr: 'MA', name: 'Meta Ads', color: '#f97316' },
 } as const;
 type ChannelKey = keyof typeof CHANNELS;
-const CHANNEL_ORDER: ChannelKey[] = ['sophia', 'whatsapp', 'instagram', 'facebook', 'metaads'];
-
-const FUNNEL_STAGES = [
-  { key: 'contacted', label: 'Contacted', color: '#e0e7ff', text: '#3730a3' },
-  { key: 'responded', label: 'Responded', color: '#a5b4fc', text: '#312e81' },
-  { key: 'qualified', label: 'Qualified', color: '#6366f1', text: '#ffffff' },
-  { key: 'interview', label: 'Interview Ready', color: '#4338ca', text: '#ffffff' },
-] as const;
 
 type Pos = {
   title: string;
   status: 'Open' | 'On Hold' | 'Filled';
-  qualified: number;
-  total: number;
-  earliestStart: string;
-  avgFit: string;
-  funnel: [number, number, number, number]; // contacted, responded, qualified, interview
-  channels: Record<ChannelKey, [number, number]>; // [contacted, responses]
 };
 
-/* Where each position's "Review candidates" link jumps to. Falls back to the
-   shared position workspace for positions without a dedicated route. */
-const POSITION_PATH: Record<string, string> = {
-  'Servicetechniker für Kaffeeautomaten': '/clients/positions',
-  Lagerlogistiker: '/clients/positions-2',
+/* Position workspace routes are parameterized by mock position id. */
+const POSITION_ID_BY_TITLE: Record<string, string> = {
+  'Servicetechniker für Kaffeeautomaten': 'p1',
+  Lagerlogistiker: 'p2',
+  'Bürokauffrau': 'p3',
 };
-const positionPath = (title: string) => POSITION_PATH[title] ?? '/clients/positions';
+const positionPath = (title: string) =>
+  `/clients/positions/${POSITION_ID_BY_TITLE[title] ?? 'p1'}`;
 
+/* The open positions of the client; per-position pipeline data lives in
+   FOCUS_BY_TITLE, candidate data in the talent store. */
 const POSITIONS: Pos[] = [
-  {
-    title: 'Servicetechniker für Kaffeeautomaten', status: 'Open',
-    qualified: 3, total: 21, earliestStart: 'May 2026', avgFit: '84%',
-    funnel: [90, 30, 8, 3],
-    channels: { sophia: [18, 7], whatsapp: [12, 9], instagram: [22, 5], facebook: [8, 3], metaads: [30, 6] },
-  },
-  {
-    title: 'Lagerlogistiker', status: 'Open',
-    qualified: 3, total: 16, earliestStart: 'May 2026', avgFit: '81%',
-    funnel: [65, 24, 8, 3],
-    channels: { sophia: [14, 6], whatsapp: [10, 8], instagram: [16, 4], facebook: [6, 2], metaads: [20, 5] },
-  },
-  {
-    title: 'Bürokauffrau', status: 'Open',
-    qualified: 2, total: 12, earliestStart: 'Jun 2026', avgFit: '77%',
-    funnel: [48, 16, 5, 1],
-    channels: { sophia: [10, 3], whatsapp: [8, 5], instagram: [12, 3], facebook: [4, 1], metaads: [15, 4] },
-  },
+  { title: 'Servicetechniker für Kaffeeautomaten', status: 'Open' },
+  { title: 'Lagerlogistiker', status: 'Open' },
+  { title: 'Bürokauffrau', status: 'Open' },
 ];
-
-/* Pipeline-pulse metrics — an alternative card body keyed by position title.
-   Positions listed here render the "ready to interview + pipeline + this week"
-   layout instead of the default qualified/funnel/channel layout. */
-type PulseStage = { label: string; value: number; color: string; text: string };
-type PulseEvent = { kind: 'add' | 'up' | 'drop'; delta: string; text: string };
-type PulseData = { readyToInterview: number; pipeline: PulseStage[]; thisWeek: PulseEvent[] };
-const PULSE_BY_TITLE: Record<string, PulseData> = {
-  Lagerlogistiker: {
-    readyToInterview: 3,
-    pipeline: [
-      { label: 'Sourcing', value: 11, color: '#a5b4fc', text: '#1e1b4b' },
-      { label: 'Screening', value: 4, color: '#818cf8', text: '#ffffff' },
-      { label: 'Ready', value: 3, color: '#4f46e5', text: '#ffffff' },
-    ],
-    thisWeek: [
-      { kind: 'add', delta: '+6', text: 'new candidates contacted' },
-      { kind: 'up', delta: '+2', text: 'advanced to interview-ready' },
-      { kind: 'drop', delta: '1', text: 'dropped — salary expectation' },
-    ],
-  },
-};
 
 /* Rich "focus" card data keyed by position title — a smooth pipeline funnel plus a
    ranked candidate highlight list. Positions listed here render PositionFocusCard. */
@@ -122,13 +77,13 @@ type FocusData = {
 };
 const FOCUS_BY_TITLE: Record<string, FocusData> = {
   'Servicetechniker für Kaffeeautomaten': {
-    total: 30, qualified: 10, status: 'Active',
+    total: 26, qualified: 6, status: 'Active',
     // Sourcing: applied across channels · Screening: in active exchange · Matched: fit confirmed.
-    // history: KW19 → KW23 (newest last); value + week-over-week delta derive from the selected week.
+    // history: last 5 weeks (newest last); Matched ends at the position's pool size.
     funnel: [
       { label: 'Sourcing', history: [10, 12, 15, 19, 26] },
       { label: 'Screening', history: [4, 5, 6, 7, 10] },
-      { label: 'Matched', history: [1, 1, 2, 2, 3] },
+      { label: 'Matched', history: [2, 3, 4, 5, 6] },
     ],
     initialCount: 3,
     // Highlights = this position's candidates, best match first (resolved from the store).
@@ -141,11 +96,11 @@ const FOCUS_BY_TITLE: Record<string, FocusData> = {
     ],
   },
   'Lagerlogistiker': {
-    total: 19, qualified: 6, status: 'Active',
+    total: 16, qualified: 1, status: 'Active',
     funnel: [
       { label: 'Sourcing', history: [6, 9, 11, 12, 16] },
       { label: 'Screening', history: [2, 3, 3, 4, 6] },
-      { label: 'Matched', history: [0, 1, 1, 1, 3] },
+      { label: 'Matched', history: [0, 0, 1, 1, 1] },
     ],
     initialCount: 3,
     candidates: [
@@ -153,11 +108,11 @@ const FOCUS_BY_TITLE: Record<string, FocusData> = {
     ],
   },
   'Bürokauffrau': {
-    total: 12, qualified: 4, status: 'Active',
+    total: 10, qualified: 1, status: 'Active',
     funnel: [
       { label: 'Sourcing', history: [4, 5, 6, 7, 10] },
       { label: 'Screening', history: [1, 2, 2, 3, 4] },
-      { label: 'Matched', history: [0, 0, 1, 1, 2] },
+      { label: 'Matched', history: [0, 0, 0, 1, 1] },
     ],
     initialCount: 3,
     candidates: [
@@ -267,25 +222,6 @@ function SectionLabel({ children, trailing }: { children: React.ReactNode; trail
       {trailing}
       <span className="flex-1 h-px bg-white/10" />
     </div>
-  );
-}
-
-/* ── Dark hover tooltips (appear above anchor, caret below) ── */
-function Tip({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-20 whitespace-nowrap">
-      <div className="rounded-md bg-[#0f172a] text-white px-2.5 py-1.5 text-[11px] leading-snug">{children}</div>
-      <span className="absolute left-1/2 -translate-x-1/2 top-full -mt-1 w-2 h-2 rotate-45 bg-[#0f172a]" />
-    </div>
-  );
-}
-function ChannelTip({ name, contacted, responses }: { name: string; contacted: number; responses: number }) {
-  return (
-    <Tip>
-      <p className="font-semibold">{name}</p>
-      <p className="text-[#94a3b8]">{contacted} candidates contacted</p>
-      <p className="text-[#94a3b8]">{responses} responses</p>
-    </Tip>
   );
 }
 
@@ -506,117 +442,20 @@ export const ALL_CANDIDATES: Cand[] = Object.values(TALENT)
   }))
   .sort((a, b) => b.fitPct - a.fitPct);
 
-/* ── Inner position content (no card chrome) — reused by the collapsed card
-   and as the left column of the expanded full-width card. ── */
+/* ── Inner position content (no card chrome) — the left column of the expanded
+   full-width card. Every position renders the focus layout (funnel + highlights). ── */
 function PositionDetails({ p, phase = 0 }: { p: Pos; phase?: number }) {
   const navigate = useNavigate();
-  const pulse = PULSE_BY_TITLE[p.title];
   const focus = FOCUS_BY_TITLE[p.title];
   const goToPosition = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); navigate(positionPath(p.title)); };
 
-  if (focus) {
-    return (
-      <div className="flex flex-col h-full">
-        <FocusSummary title={p.title} d={focus} phase={phase} />
-        <div className="mt-auto pt-3 flex justify-end">
-          <a href="#" onClick={goToPosition} className="text-[12px] font-medium text-[#4f46e5] no-underline rounded-lg px-3 py-1.5 border border-transparent transition-colors hover:bg-white/70 hover:border-[#e6e9f3] hover:shadow-sm">Review candidates →</a>
-        </div>
-      </div>
-    );
-  }
-
+  if (!focus) return null;
   return (
     <div className="flex flex-col h-full">
-      {/* Section 1 — header */}
-      <div className="flex items-center justify-between gap-3 pr-6">
-        <h3 className="text-[14px] font-semibold text-[#0f172a] truncate" title={p.title}>{p.title}</h3>
-        <span className="shrink-0 text-[11px] rounded-full px-2 py-0.5 text-[#16a34a] bg-[#f0fdf4] border border-[#bbf7d0]">{p.status}</span>
+      <FocusSummary title={p.title} d={focus} phase={phase} />
+      <div className="mt-auto pt-3 flex justify-end">
+        <a href="#" onClick={goToPosition} className="text-[12px] font-medium text-[#4f46e5] no-underline rounded-lg px-3 py-1.5 border border-transparent transition-colors hover:bg-white/70 hover:border-[#e6e9f3] hover:shadow-sm">Review candidates →</a>
       </div>
-
-      {pulse ? (
-        <PositionPulseBody d={pulse} />
-      ) : (
-        <>
-          {/* Section 2 — key metric */}
-          <div className="mt-3.5">
-            <p className="text-[30px] font-bold text-[#0f172a] leading-none">{p.qualified}</p>
-            <p className="text-[12px] text-[#64748b] mt-1.5">qualified candidates</p>
-          </div>
-
-          {/* Section 3 — metadata chips */}
-          <div className="mt-3 flex w-full rounded-md bg-[#f8fafc]">
-            {[
-              { label: 'Total Candidates', value: `${p.total} total` },
-              { label: 'Earliest Start', value: p.earliestStart },
-              { label: 'Avg. Fit Score', value: p.avgFit },
-            ].map((m, i) => (
-              <div key={m.label} className="flex flex-1">
-                {i > 0 && <span className="w-px bg-[#e2e8f0] my-1.5" />}
-                <div className="flex-1 text-center" style={{ padding: '6px 0' }}>
-                  <p className="text-[9px] uppercase tracking-wide text-[#94a3b8]">{m.label}</p>
-                  <p className="text-[12px] font-semibold text-[#0f172a] mt-0.5">{m.value}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Section 4 — recruitment funnel */}
-          <div className="mt-4">
-            <p className="text-[9px] uppercase tracking-[0.08em] text-[#94a3b8] mb-1.5">Recruitment Funnel</p>
-            <div className="flex items-stretch">
-              {FUNNEL_STAGES.map((s, i) => {
-                const val = p.funnel[i];
-                return (
-                  <div key={s.key} className="relative group flex flex-col items-center" style={{ flexGrow: val, flexBasis: 0, minWidth: 56 }}>
-                    <div className="w-full flex items-center justify-center" style={{ height: 36, background: s.color, color: s.text, clipPath: 'polygon(0 0, 100% 8%, 100% 92%, 0 100%)' }}>
-                      <span className="text-[12px] font-bold">{val}</span>
-                    </div>
-                    <p className="text-[9px] text-[#94a3b8] mt-1 text-center leading-tight">{s.label}</p>
-                    <Tip>{val} candidates at this stage</Tip>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Section 5 — channel nodes (real brand logos, matching the Outreach section) */}
-          <div className="mt-3.5 flex justify-between">
-            {CHANNEL_ORDER.map(key => {
-              const ch = CHANNELS[key];
-              const [contacted, responses] = p.channels[key];
-              return (
-                <div key={key} className="flex flex-col items-center gap-1.5">
-                  <div className="relative group">
-                    <OutreachLogo k={key} size={36} />
-                    <ChannelTip name={ch.name} contacted={contacted} responses={responses} />
-                  </div>
-                  <span className="text-[9px] text-[#94a3b8]">{ch.name}</span>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      {/* Section 6 — footer */}
-      <div className="mt-auto pt-2.5 flex justify-end">
-        <a href="#" onClick={goToPosition} className="text-[12px] font-medium text-[#4f46e5] no-underline rounded-lg px-3 py-1.5 border border-transparent transition-colors hover:bg-white/70 hover:border-[#e6e9f3] hover:shadow-sm">
-          {pulse ? 'Review candidates →' : 'View position →'}
-        </a>
-      </div>
-    </div>
-  );
-}
-
-/* ── Collapsed, clickable position card (default row + below row). ── */
-function PositionCard({ p, onSelect, fullWidth = false }: { p: Pos; onSelect?: () => void; fullWidth?: boolean }) {
-  return (
-    <div
-      onClick={onSelect}
-      className="rounded-[10px] border border-[#e2e8f0] flex flex-col shrink-0 cursor-pointer transition-all duration-200 hover:-translate-y-[3px] hover:border-[#c7d2fe] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
-      style={{ width: fullWidth ? '100%' : 'clamp(360px, 30vw, 460px)', padding: '16px 18px 12px', scrollSnapAlign: 'start', background: CARD_GRADIENT }}
-    >
-      <PositionDetails p={p} />
     </div>
   );
 }
@@ -638,30 +477,31 @@ const STAT_FILTERS: { key: StatKey; label: string }[] = [
    the current week (KW 23); each step back maps to KW 22 / 21 / 20. */
 type ActivityKind = 'mail' | 'phone' | 'funnel' | 'star';
 type ActivityStat = { icon: ActivityKind; label: string; trend: number[] };
+/* Scaled to the demo pool; 'all' is the element-wise sum of the three positions. */
 const WEEKLY_ACTIVITY_BY: Record<StatKey, ActivityStat[]> = {
   all: [
-    { icon: 'mail', label: 'candidates contacted', trend: [15, 18, 20, 22, 28, 25, 31, 29, 35, 47] },
-    { icon: 'phone', label: 'Sophia calls completed', trend: [6, 7, 8, 9, 11, 10, 13, 12, 14, 18] },
-    { icon: 'funnel', label: 'advanced to screening', trend: [4, 5, 5, 6, 7, 7, 8, 9, 9, 12] },
-    { icon: 'star', label: 'became interview-ready', trend: [1, 0, 1, 1, 1, 2, 1, 2, 1, 3] },
+    { icon: 'mail', label: 'candidates contacted', trend: [5, 6, 7, 8, 10, 9, 12, 11, 13, 14] },
+    { icon: 'phone', label: 'Sophia calls completed', trend: [2, 3, 3, 4, 5, 4, 6, 5, 6, 7] },
+    { icon: 'funnel', label: 'advanced to screening', trend: [1, 2, 2, 2, 3, 3, 3, 4, 4, 5] },
+    { icon: 'star', label: 'became interview-ready', trend: [0, 0, 1, 0, 1, 1, 1, 2, 1, 2] },
   ],
   service: [
-    { icon: 'mail', label: 'candidates contacted', trend: [6, 8, 9, 9, 12, 10, 13, 12, 15, 20] },
-    { icon: 'phone', label: 'Sophia calls completed', trend: [2, 3, 3, 4, 5, 4, 6, 5, 6, 8] },
-    { icon: 'funnel', label: 'advanced to screening', trend: [1, 2, 2, 2, 3, 3, 3, 4, 4, 5] },
+    { icon: 'mail', label: 'candidates contacted', trend: [3, 4, 4, 5, 6, 5, 7, 6, 8, 8] },
+    { icon: 'phone', label: 'Sophia calls completed', trend: [1, 2, 2, 2, 3, 2, 4, 3, 4, 4] },
+    { icon: 'funnel', label: 'advanced to screening', trend: [1, 1, 1, 1, 2, 2, 2, 2, 3, 3] },
     { icon: 'star', label: 'became interview-ready', trend: [0, 0, 1, 0, 1, 0, 1, 1, 0, 1] },
   ],
   lager: [
-    { icon: 'mail', label: 'candidates contacted', trend: [5, 6, 6, 7, 9, 8, 10, 9, 11, 16] },
-    { icon: 'phone', label: 'Sophia calls completed', trend: [2, 2, 3, 3, 4, 3, 5, 4, 5, 6] },
-    { icon: 'funnel', label: 'advanced to screening', trend: [1, 1, 2, 2, 2, 3, 3, 3, 3, 4] },
-    { icon: 'star', label: 'became interview-ready', trend: [0, 1, 0, 0, 1, 1, 0, 1, 0, 1] },
+    { icon: 'mail', label: 'candidates contacted', trend: [1, 1, 2, 2, 3, 3, 3, 3, 3, 4] },
+    { icon: 'phone', label: 'Sophia calls completed', trend: [1, 1, 1, 1, 1, 1, 1, 1, 1, 2] },
+    { icon: 'funnel', label: 'advanced to screening', trend: [0, 1, 1, 1, 1, 1, 1, 1, 1, 1] },
+    { icon: 'star', label: 'became interview-ready', trend: [0, 0, 0, 0, 0, 1, 0, 1, 0, 1] },
   ],
   buero: [
-    { icon: 'mail', label: 'candidates contacted', trend: [3, 4, 5, 6, 7, 7, 8, 8, 9, 11] },
-    { icon: 'phone', label: 'Sophia calls completed', trend: [1, 1, 2, 2, 2, 3, 2, 3, 3, 4] },
-    { icon: 'funnel', label: 'advanced to screening', trend: [0, 1, 1, 1, 2, 2, 2, 2, 2, 3] },
-    { icon: 'star', label: 'became interview-ready', trend: [0, 1, 1, 1, 0, 1, 0, 1, 1, 1] },
+    { icon: 'mail', label: 'candidates contacted', trend: [1, 1, 1, 1, 1, 1, 2, 2, 2, 2] },
+    { icon: 'phone', label: 'Sophia calls completed', trend: [0, 0, 0, 1, 1, 1, 1, 1, 1, 1] },
+    { icon: 'funnel', label: 'advanced to screening', trend: [0, 0, 0, 0, 0, 0, 0, 1, 0, 1] },
+    { icon: 'star', label: 'became interview-ready', trend: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0] },
   ],
 };
 const ACTIVITY_HISTORY = 10;        // points stored per trend
@@ -680,7 +520,7 @@ const DROPOFF_BY: Record<StatKey, DropOffData> = {
       { label: 'Not interested', pct: 12 },
       { label: 'No response', pct: 8 },
     ],
-    opportunity: { count: '8 candidates', before: 'would accept at', money: '+200€', after: 'above your current offer. Worth discussing your salary band.' },
+    opportunity: { count: '3 candidates', before: 'would accept at', money: '+200€', after: 'above your current offer. Worth discussing your salary band.' },
   },
   service: {
     reasons: [
@@ -690,7 +530,7 @@ const DROPOFF_BY: Record<StatKey, DropOffData> = {
       { label: 'Not interested', pct: 10 },
       { label: 'No response', pct: 6 },
     ],
-    opportunity: { count: '5 candidates', before: 'would accept at', money: '+250€', after: 'above your current offer for this role.' },
+    opportunity: { count: '2 candidates', before: 'would accept at', money: '+250€', after: 'above your current offer for this role.' },
   },
   lager: {
     reasons: [
@@ -700,7 +540,7 @@ const DROPOFF_BY: Record<StatKey, DropOffData> = {
       { label: 'Skill gap', pct: 12 },
       { label: 'Not interested', pct: 8 },
     ],
-    opportunity: { count: '4 candidates', before: 'dropped on distance — a shuttle or relocation budget could re-engage them.', after: '' },
+    opportunity: { count: '1 candidate', before: 'dropped on distance — a shuttle or relocation budget could re-engage them.', after: '' },
   },
   buero: {
     reasons: [
@@ -710,7 +550,7 @@ const DROPOFF_BY: Record<StatKey, DropOffData> = {
       { label: 'Location too far', pct: 12 },
       { label: 'No response', pct: 8 },
     ],
-    opportunity: { count: '3 candidates', before: 'would re-engage with a clearer remote / hybrid arrangement.', after: '' },
+    opportunity: { count: '1 candidate', before: 'would re-engage with a clearer remote / hybrid arrangement.', after: '' },
   },
 };
 
@@ -1055,62 +895,6 @@ function OutreachFunnel() {
   );
 }
 
-/* Small leading icons for the "this week" change log. */
-function PulseEventIcon({ kind }: { kind: PulseEvent['kind'] }) {
-  const common = { className: 'w-4 h-4', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' } as const;
-  if (kind === 'add')
-    return (<svg {...common}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M15 19v-1a4 4 0 00-4-4H6a4 4 0 00-4 4v1m11-7a3 3 0 100-6 3 3 0 000 6zm6-3v6m3-3h-6" /></svg>);
-  if (kind === 'up')
-    return (<svg {...common}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M12 19V5m0 0l-6 6m6-6l6 6" /></svg>);
-  return (<svg {...common}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M6 6l12 12M18 6L6 18" /></svg>);
-}
-
-/* ── Pulse body (light) — drop-in replacement for the default metrics inside the
-   white position card. Header + footer come from PositionDetails; this renders
-   the "ready to interview" metric, the pipeline stage bars, and the weekly log. ── */
-function PositionPulseBody({ d }: { d: PulseData }) {
-  const max = Math.max(...d.pipeline.map(s => s.value));
-  return (
-    <>
-      {/* Key metric */}
-      <div className="mt-3.5">
-        <p className="text-[30px] font-bold text-[#0f172a] leading-none">{d.readyToInterview}</p>
-        <p className="text-[12px] text-[#64748b] mt-1.5">ready to interview</p>
-      </div>
-
-      {/* Pipeline stage bars */}
-      <p className="text-[9px] uppercase tracking-[0.08em] text-[#94a3b8] mt-4 mb-2">Pipeline</p>
-      <div className="flex flex-col gap-2">
-        {d.pipeline.map(s => (
-          <div key={s.label} className="flex items-center gap-3">
-            <div className="flex-1 h-7 rounded-md bg-[#f1f5f9] overflow-hidden">
-              <div
-                className="h-full rounded-md flex items-center px-2.5"
-                style={{ width: `${(s.value / max) * 100}%`, minWidth: 32, background: s.color }}
-              >
-                <span className="text-[12px] font-bold tabular-nums" style={{ color: s.text }}>{s.value}</span>
-              </div>
-            </div>
-            <span className="w-20 text-right text-[12px] text-[#475569]">{s.label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* This-week change log */}
-      <p className="text-[9px] uppercase tracking-[0.08em] text-[#94a3b8] mt-4 mb-2">This Week</p>
-      <ul className="flex flex-col gap-2">
-        {d.thisWeek.map((e, i) => (
-          <li key={i} className="flex items-center gap-2.5 text-[12px] text-[#475569]">
-            <span className="text-[#94a3b8] shrink-0"><PulseEventIcon kind={e.kind} /></span>
-            <span className="font-bold text-[#0f172a] tabular-nums w-5">{e.delta}</span>
-            <span>{e.text}</span>
-          </li>
-        ))}
-      </ul>
-    </>
-  );
-}
-
 /* ──────────────────────────────────────────────────────────────────────────
    Position focus card (dark) — a single position's pipeline funnel + the week's
    candidate highlights. Larger than the standard position cards by design.
@@ -1405,7 +1189,7 @@ function PositionFocusCard({ p, d, onSelect, phase = 0, fullWidth = false }: { p
       {/* This week's focus — expandable candidate list */}
       <div className="flex items-center justify-between mb-2.5">
         <span className="text-[11px] uppercase tracking-[0.12em] font-semibold text-[#94a3b8]">This Week's Focus</span>
-        <span className="text-[12px] text-[#94a3b8]">{d.candidates.length} highlights</span>
+        <span className="text-[12px] text-[#94a3b8]">{d.candidates.length} highlight{d.candidates.length === 1 ? '' : 's'}</span>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -1761,6 +1545,14 @@ export default function Dashboard() {
   const [statFilter, setStatFilter] = useState<StatKey>('all');
   const locations = locationsFor(statFilter);
 
+  // Hero: matched = sum of the funnel "Matched" values; interviewing = live
+  // kanban count (updates instantly when a card is dragged into the stage).
+  const stageState = useStages();
+  const matchedTotal = Object.values(FOCUS_BY_TITLE).reduce(
+    (a, d) => a + d.funnel[2].history[FUNNEL_HISTORY - 1], 0,
+  );
+  const interviewingCount = Object.values(stageState).filter(s => s.stage === 'interview').length;
+
   const selectedIdx = selected ? POSITIONS.findIndex(p => p.title === selected) : -1;
   const selectedPos = selectedIdx >= 0 ? POSITIONS[selectedIdx] : null;
   const selectedCandidates = selectedPos ? ALL_CANDIDATES.filter(c => c.position === selectedPos.title) : [];
@@ -1776,15 +1568,13 @@ export default function Dashboard() {
     }
   }, [selected, selectedIdx]);
 
-  /* Positions with focus data render the larger PositionFocusCard; the rest use
-     the standard clickable card. */
+  /* Every position renders the focus card (funnel + candidate highlights). */
   const renderPositionCard = (p: Pos, fullWidth = false) => {
     const focus = FOCUS_BY_TITLE[p.title];
+    if (!focus) return null;
     // Offset each position's funnel animation so the three cards look distinct.
     const phase = POSITIONS.findIndex(x => x.title === p.title) * 1.7;
-    return focus
-      ? <PositionFocusCard key={p.title} p={p} d={focus} onSelect={() => setSelected(p.title)} phase={phase} fullWidth={fullWidth} />
-      : <PositionCard key={p.title} p={p} onSelect={() => setSelected(p.title)} fullWidth={fullWidth} />;
+    return <PositionFocusCard key={p.title} p={p} d={focus} onSelect={() => setSelected(p.title)} phase={phase} fullWidth={fullWidth} />;
   };
 
   return (
@@ -1810,14 +1600,14 @@ export default function Dashboard() {
             <h1 className="mt-1.5 text-[26px] leading-tight font-bold tracking-tight text-white">Talent Pipeline</h1>
           </div>
 
-          {/* metrics */}
+          {/* metrics — funnel volume, funnel outcome, kanban action */}
           <div className="relative z-10 flex items-center gap-x-5 sm:gap-7 gap-y-4 flex-wrap">
             <div className="flex items-center gap-x-5 sm:gap-7">
-              <HeroMetric label="Active Positions" value={HERO_METRICS.active} />
+              <HeroMetric label="New Applications" value={HERO_APPLICATIONS.value} delta={HERO_APPLICATIONS.delta} />
               <span className="w-px h-9 bg-white/[0.10]" />
-              <HeroMetric label="Pipeline Growth" value={HERO_METRICS.growth} delta={HERO_METRICS.growthDelta} />
+              <HeroMetric label="Matched Candidates" value={String(matchedTotal)} />
               <span className="w-px h-9 bg-white/[0.10]" />
-              <HeroMetric label="Ready to Interview" value={HERO_METRICS.ready} />
+              <HeroMetric label="Interviewing" value={String(interviewingCount)} />
             </div>
           </div>
         </div>

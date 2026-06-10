@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { mockPositions, mockCandidates } from '../data/mockData';
 import { WaveBackground } from '../components/SophiaChrome';
 import { PipelineBoard } from '../dashboard/Dashboard';
@@ -38,7 +38,9 @@ const statusLabels: Record<PositionStatus, string> = {
 };
 
 export default function PositionWorkspace() {
-  const position = mockPositions[0];
+  // Parameterized by position id (/clients/positions/:positionId); defaults to p1.
+  const { positionId } = useParams<{ positionId: string }>();
+  const position = mockPositions.find(p => p.id === positionId) ?? mockPositions[0];
   const [tab, setTab] = useState<Tab>('candidate');
 
   if (!position) {
@@ -90,7 +92,28 @@ export default function PositionWorkspace() {
       <div className="flex-1 min-h-0 overflow-auto page-top-fade">
         {tab === 'candidate' && <CandidatesPane position={position} />}
         {tab === 'comparison' && <ComparisonView position={position} />}
-        {tab === 'job-description' && <JobDescriptionSectionView position={position} />}
+        {/* JD content is only seeded for p1 in the prototype; other positions show
+            the state a position has before its JD was imported. */}
+        {tab === 'job-description' && (position.id === 'p1'
+          ? <JobDescriptionSectionView position={position} />
+          : (
+            <TabEmptyState
+              title="Job description not yet imported"
+              hint="Upload or paste the JD for this position — sections, hard facts and Sophia's screening questions are generated from it."
+            />
+          ))}
+      </div>
+    </div>
+  );
+}
+
+/* Shared empty state for tabs whose data has not been created for a position yet. */
+function TabEmptyState({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div className="px-5 pt-5 pb-10">
+      <div className="max-w-xl mx-auto mt-16 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] px-8 py-12 text-center">
+        <p className="text-[15px] font-semibold text-white">{title}</p>
+        <p className="text-[13px] text-[#94a3b8] leading-relaxed mt-2">{hint}</p>
       </div>
     </div>
   );
@@ -194,6 +217,13 @@ function fmtSalary(s: string | null): React.ReactNode {
   return Number.isNaN(n) ? s : `${n.toLocaleString('de-DE')} €`;
 }
 
+/* ISO date → German format (01.08.2026). */
+function fmtStartDate(iso: string | null): React.ReactNode {
+  if (!iso) return <span className="text-[#475569]">—</span>;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 const PAGE_SIZE = 10;
 
 function CandidateTable({ positionTitle, statusFilter }: { positionTitle: string; statusFilter: Stage | 'all' }) {
@@ -250,7 +280,7 @@ function CandidateTable({ positionTitle, statusFilter }: { positionTitle: string
                 </div>
                 {/* Earliest Start */}
                 <div className="py-3 flex items-center">
-                  <span className="text-xs text-[#94a3b8]">{c.earliestStart ?? <span className="text-[#475569]">—</span>}</span>
+                  <span className="text-sm text-[#cbd5e1] tabular-nums">{fmtStartDate(c.earliestStart)}</span>
                 </div>
                 {/* Match */}
                 <div className="py-3 flex items-center">
@@ -677,13 +707,25 @@ function ComparisonView({ position }: { position: Position }) {
   const [sortAsc, setSortAsc] = useState(false);
 
   const rows = useMemo(() => {
-    return [...COMP_ROWS].sort((a, b) => {
-      const va = compSortValue(a, sortKey);
-      const vb = compSortValue(b, sortKey);
-      const cmp = typeof va === 'string' ? va.localeCompare(vb as string, 'de') : va - (vb as number);
-      return cmp * (sortAsc ? 1 : -1);
-    });
-  }, [sortKey, sortAsc]);
+    // Only candidates matched to THIS position (MECE with table and kanban).
+    return COMP_ROWS
+      .filter(r => TALENT[r.id]?.position === position.title)
+      .sort((a, b) => {
+        const va = compSortValue(a, sortKey);
+        const vb = compSortValue(b, sortKey);
+        const cmp = typeof va === 'string' ? va.localeCompare(vb as string, 'de') : va - (vb as number);
+        return cmp * (sortAsc ? 1 : -1);
+      });
+  }, [sortKey, sortAsc, position.title]);
+
+  if (rows.length === 0) {
+    return (
+      <TabEmptyState
+        title="No screening results yet"
+        hint="The comparison fills up as candidates for this position complete their Sophia screening."
+      />
+    );
+  }
 
   // Default direction: "best first" — ascending where lower is better (salary, start, distance, name).
   const toggleSort = (key: CompSortKey) => {

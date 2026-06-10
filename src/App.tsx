@@ -4,7 +4,6 @@ import AiCandidates from './candidates/AiCandidates';
 import CandidateDetail from './candidates/CandidateDetail';
 import Positions from './positions/Positions';
 import PositionDetail from './positions/PositionDetail';
-import ClientPositions from './positions/ClientPositions';
 import PositionWorkspace from './positions/PositionWorkspace';
 import Employers from './clients/Employers';
 import PositionCandidateDetail from './positions/PositionCandidateDetail';
@@ -48,7 +47,7 @@ export default function App() {
             <Route path="/clients/new-position" element={<NewPosition />} />
             <Route path="/clients/positions" element={<PositionWorkspace />} />
             <Route path="/clients/positions/candidate/:id" element={<PositionCandidateDetail />} />
-            <Route path="/clients/positions-2" element={<ClientPositions />} />
+            <Route path="/clients/positions/:positionId" element={<PositionWorkspace />} />
             <Route path="/sophia-calls" element={<Placeholder title="Sophia Calls" />} />
             <Route path="/hr-calls" element={<Placeholder title="HR Calls" />} />
             <Route path="/whatsapp" element={<Placeholder title="WhatsApp" />} />

@@ -446,7 +446,7 @@ Wir bieten
   },
   {
     id: 'p3',
-    title: 'Bürokauffrau / Bürokaufmann',
+    title: 'Bürokauffrau',
     description: 'Allgemeine Verwaltung, Buchhaltung und Kundenkommunikation in Vollzeit. Vorbereitung der Monats- und Jahresabschlüsse in Zusammenarbeit mit dem Steuerberater.',
     employer: 'Kanzlei Fischer & Partner',
     receivedAt: '2026-04-15',
