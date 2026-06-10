@@ -10,14 +10,8 @@ import wandelLogo from '../assets/wandel-logo.png';
    Three structural zones: dark header band · white main · off-white right rail.
    ────────────────────────────────────────────────────────────────────────── */
 
-type WeekData = { id: string; label: string; range: string; active: string; growth: string; growthDelta: string; ready: string };
-// Mock data per calendar week (current + the previous three).
-const WEEKS: WeekData[] = [
-  { id: 'kw23', label: 'KW 23', range: '1–7 Jun', active: '3', growth: '24', growthDelta: '+5', ready: '3' },
-  { id: 'kw22', label: 'KW 22', range: '25–31 May', active: '3', growth: '19', growthDelta: '+4', ready: '2' },
-  { id: 'kw21', label: 'KW 21', range: '18–24 May', active: '2', growth: '15', growthDelta: '+6', ready: '2' },
-  { id: 'kw20', label: 'KW 20', range: '11–17 May', active: '2', growth: '9', growthDelta: '+3', ready: '1' },
-];
+// Current hero metrics (single snapshot — no week switching).
+const HERO_METRICS = { active: '3', growth: '24', growthDelta: '+5', ready: '3' };
 
 /* Channel registry — abbreviations + node colors shared across the page. */
 const CHANNELS = {
@@ -165,16 +159,14 @@ const FOCUS_BY_TITLE: Record<string, FocusData> = {
 /* Largest funnel value across all positions — the funnel heights are scaled to
    this shared max so each position's funnel is proportional to the real numbers
    (tallest reaches the max height, smaller positions are visibly shorter). */
-const FUNNEL_HISTORY = 5; // weeks stored per funnel stage (KW19 → KW23)
-// Scale funnel heights to the largest value across all positions/weeks, so the
-// shared max height stays stable and a past week reads as a proportionally
-// smaller funnel.
+const FUNNEL_HISTORY = 5; // weeks stored per funnel stage (history drives the deltas)
+// Scale funnel heights to the largest value across all positions, so each
+// position's funnel is proportional to the real numbers.
 const FUNNEL_VALUE_MAX = Math.max(...Object.values(FOCUS_BY_TITLE).flatMap(d => d.funnel.flatMap(s => s.history)));
 
-/* Resolve a position's funnel to concrete stage values + week-over-week deltas
-   for the selected calendar week (weekIndex 0 = current … 3 = three weeks back). */
-function resolveFunnel(funnel: FocusFunnelStage[], weekIndex: number): FocusStage[] {
-  const idx = (FUNNEL_HISTORY - 1) - weekIndex;
+/* Resolve a position's funnel to current stage values + week-over-week deltas. */
+function resolveFunnel(funnel: FocusFunnelStage[]): FocusStage[] {
+  const idx = FUNNEL_HISTORY - 1;
   return funnel.map(s => {
     const value = s.history[idx];
     const d = value - (s.history[idx - 1] ?? value);
@@ -526,7 +518,7 @@ export const ALL_CANDIDATES = [...CANDIDATES, ...CANDIDATES_MORE];
 
 /* ── Inner position content (no card chrome) — reused by the collapsed card
    and as the left column of the expanded full-width card. ── */
-function PositionDetails({ p, phase = 0, weekIndex = 0 }: { p: Pos; phase?: number; weekIndex?: number }) {
+function PositionDetails({ p, phase = 0 }: { p: Pos; phase?: number }) {
   const navigate = useNavigate();
   const pulse = PULSE_BY_TITLE[p.title];
   const focus = FOCUS_BY_TITLE[p.title];
@@ -535,7 +527,7 @@ function PositionDetails({ p, phase = 0, weekIndex = 0 }: { p: Pos; phase?: numb
   if (focus) {
     return (
       <div className="flex flex-col h-full">
-        <FocusSummary title={p.title} d={focus} phase={phase} weekIndex={weekIndex} />
+        <FocusSummary title={p.title} d={focus} phase={phase} />
         <div className="mt-auto pt-3 flex justify-end">
           <a href="#" onClick={goToPosition} className="text-[12px] font-medium text-[#4f46e5] no-underline rounded-lg px-3 py-1.5 border border-transparent transition-colors hover:bg-white/70 hover:border-[#e6e9f3] hover:shadow-sm">Review candidates →</a>
         </div>
@@ -627,12 +619,12 @@ function PositionDetails({ p, phase = 0, weekIndex = 0 }: { p: Pos; phase?: numb
 }
 
 /* ── Collapsed, clickable position card (default row + below row). ── */
-function PositionCard({ p, onSelect }: { p: Pos; onSelect?: () => void }) {
+function PositionCard({ p, onSelect, fullWidth = false }: { p: Pos; onSelect?: () => void; fullWidth?: boolean }) {
   return (
     <div
       onClick={onSelect}
       className="rounded-[10px] border border-[#e2e8f0] flex flex-col shrink-0 cursor-pointer transition-all duration-200 hover:-translate-y-[3px] hover:border-[#c7d2fe] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
-      style={{ width: 'clamp(360px, 30vw, 460px)', padding: '20px 20px 14px', scrollSnapAlign: 'start', background: CARD_GRADIENT }}
+      style={{ width: fullWidth ? '100%' : 'clamp(360px, 30vw, 460px)', padding: '16px 18px 12px', scrollSnapAlign: 'start', background: CARD_GRADIENT }}
     >
       <PositionDetails p={p} />
     </div>
@@ -1146,7 +1138,7 @@ function PositionPulseBody({ d }: { d: PulseData }) {
    faint drop shadow and sheen, light motes quietly drifting through it (clipped
    to the shape so they narrow toward the tip), and a calm pulsing endpoint.
    Sits inside the frosted "milky" box. */
-const FUNNEL_W = 640, FUNNEL_H = 142, FUNNEL_CY = 94, FUNNEL_HMAX = 34;
+const FUNNEL_W = 640, FUNNEL_H = 100, FUNNEL_CY = 66, FUNNEL_HMAX = 24;
 const FUNNEL_PAD = 8;
 const FUNNEL_TIP = 0.9;                       // value the curve tapers to at the tip
 const FUNNEL_STAGE_F = [1 / 6, 1 / 2, 5 / 6]; // x-fraction of each stage's centre
@@ -1255,12 +1247,16 @@ function FocusFunnel({ stages, phase = 0 }: { stages: FocusStage[]; phase?: numb
         {stages.map((s, i) => (
           <div
             key={s.label}
-            className="absolute flex items-end justify-center gap-1.5"
+            className="absolute"
             style={{ left: `${FUNNEL_STAGE_F[i] * 100}%`, top: FUNNEL_CY - hh(s.value) - 9, transform: 'translate(-50%, -100%)' }}
           >
-            <span className="text-[30px] font-bold leading-none tabular-nums text-[#1e293b]">{s.value}</span>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-[#6366f1] whitespace-nowrap pb-1">
-              <TrendUp />{s.delta}
+            {/* the number itself is centred over the stage label; the delta hangs
+                off to the right without shifting that centre */}
+            <span className="relative block text-[21px] font-bold leading-none tabular-nums text-[#1e293b]">
+              {s.value}
+              <span className="absolute left-full bottom-0.5 ml-1 flex items-center gap-0.5 text-[10.5px] font-semibold text-[#6366f1] whitespace-nowrap">
+                <TrendUp />{s.delta}
+              </span>
             </span>
           </div>
         ))}
@@ -1341,12 +1337,12 @@ function FocusCandidateRow({ c, delay }: { c: FocusCand; delay: number }) {
       className="flex items-center gap-3 animate-panel-in rounded-xl border border-transparent px-2.5 py-2 -mx-2.5 cursor-pointer transition-all duration-150 hover:border-[#818cf8] hover:bg-[#f5f6ff] hover:shadow-[0_2px_10px_rgba(99,102,241,0.12)]"
       style={{ animationDelay: `${delay * 50}ms` }}
     >
-      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-[13px] font-semibold shrink-0" style={{ background: c.color }}>
+      <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-[12px] font-semibold shrink-0" style={{ background: c.color }}>
         {initials(c.name)}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[15px] font-semibold text-[#0f172a] leading-tight">{c.name}</span>
+          <span className="text-[14px] font-semibold text-[#0f172a] leading-tight">{c.name}</span>
           <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border ${FOCUS_TAG_CLS[c.tag.kind]}`}>{c.tag.text}</span>
         </div>
         <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#64748b]">
@@ -1364,21 +1360,21 @@ function FocusCandidateRow({ c, delay }: { c: FocusCand; delay: number }) {
 
 /* Header + pipeline funnel — shared by the collapsed focus card and the expanded
    view's left column. */
-function FocusSummary({ title, d, phase = 0, weekIndex = 0 }: { title: string; d: FocusData; phase?: number; weekIndex?: number }) {
-  const stages = resolveFunnel(d.funnel, weekIndex);
+function FocusSummary({ title, d, phase = 0 }: { title: string; d: FocusData; phase?: number }) {
+  const stages = resolveFunnel(d.funnel);
   return (
     <>
       <div className="flex items-start justify-between gap-4 pr-6">
         <div className="min-w-0">
-          <h3 className="text-[18px] font-semibold text-[#0f172a] leading-tight">{title}</h3>
-          <p className="text-[12px] text-[#64748b] mt-1">{d.total} candidates</p>
+          <h3 className="text-[16px] font-semibold text-[#0f172a] leading-tight">{title}</h3>
+          <p className="text-[11.5px] text-[#64748b] mt-0.5">{d.total} candidates</p>
         </div>
         <span className="shrink-0 text-[11px] rounded-full px-2.5 py-1 text-[#16a34a] bg-[#f0fdf4] border border-[#bbf7d0]">{d.status}</span>
       </div>
 
       {/* Pipeline funnel — holographic dark "console" embedded in the light card */}
       <div
-        className="mt-4 rounded-2xl px-3.5 pt-3 pb-4 relative overflow-hidden border border-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.95)]"
+        className="mt-3 rounded-2xl px-3 pt-2.5 pb-3 relative overflow-hidden border border-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.10),inset_0_1px_0_rgba(255,255,255,0.95)]"
         style={{
           background: 'linear-gradient(180deg, rgba(255,255,255,0.85), rgba(233,237,247,0.62))',
           backdropFilter: 'blur(10px)',
@@ -1398,7 +1394,7 @@ function FocusSummary({ title, d, phase = 0, weekIndex = 0 }: { title: string; d
   );
 }
 
-function PositionFocusCard({ p, d, onSelect, phase = 0, weekIndex = 0 }: { p: Pos; d: FocusData; onSelect?: () => void; phase?: number; weekIndex?: number }) {
+function PositionFocusCard({ p, d, onSelect, phase = 0, fullWidth = false }: { p: Pos; d: FocusData; onSelect?: () => void; phase?: number; fullWidth?: boolean }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const shown = open ? d.candidates : d.candidates.slice(0, d.initialCount);
@@ -1409,26 +1405,26 @@ function PositionFocusCard({ p, d, onSelect, phase = 0, weekIndex = 0 }: { p: Po
     <div
       onClick={onSelect}
       className="rounded-[10px] border border-[#e2e8f0] shadow-[0_8px_24px_rgba(0,0,0,0.06)] shrink-0 cursor-pointer animate-fade-scale-in transition-all duration-200 hover:-translate-y-[3px] hover:border-[#c7d2fe] hover:shadow-[0_12px_30px_rgba(0,0,0,0.10)]"
-      style={{ width: 'clamp(560px, 48vw, 880px)', padding: '22px 24px 16px', scrollSnapAlign: 'start', background: CARD_GRADIENT }}
+      style={{ width: fullWidth ? '100%' : 'clamp(420px, 32vw, 540px)', padding: '14px 16px 10px', scrollSnapAlign: 'start', background: CARD_GRADIENT }}
     >
-      <FocusSummary title={p.title} d={d} phase={phase} weekIndex={weekIndex} />
+      <FocusSummary title={p.title} d={d} phase={phase} />
 
-      <div className="h-px bg-[#e2e8f0] my-4" />
+      <div className="h-px bg-[#e2e8f0] my-3" />
 
       {/* This week's focus — expandable candidate list */}
-      <div className="flex items-center justify-between mb-3.5">
+      <div className="flex items-center justify-between mb-2.5">
         <span className="text-[11px] uppercase tracking-[0.12em] font-semibold text-[#94a3b8]">This Week's Focus</span>
         <span className="text-[12px] text-[#94a3b8]">{d.candidates.length} highlights</span>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
         {shown.map((c, i) => <FocusCandidateRow key={c.name} c={c} delay={i} />)}
       </div>
 
       {moreCount > 0 && (
         <button
           onClick={(e) => { stop(e); setOpen(o => !o); }}
-          className="mt-3.5 w-full rounded-lg border border-[#e2e8f0] bg-[#f8fafc] py-2.5 text-[13px] font-medium text-[#475569] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors flex items-center justify-center gap-1.5"
+          className="mt-2.5 w-full rounded-lg border border-[#e2e8f0] bg-[#f8fafc] py-2 text-[12.5px] font-medium text-[#475569] hover:bg-[#f1f5f9] hover:text-[#0f172a] transition-colors flex items-center justify-center gap-1.5"
         >
           {open ? 'Show less' : `Show ${moreCount} more candidates`}
           <svg className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -1437,9 +1433,9 @@ function PositionFocusCard({ p, d, onSelect, phase = 0, weekIndex = 0 }: { p: Po
         </button>
       )}
 
-      <div className="h-px bg-[#e2e8f0] mt-4 mb-3" />
+      <div className="h-px bg-[#e2e8f0] mt-3 mb-2" />
       <div className="flex justify-end">
-        <a href="#" onClick={goToPosition} className="text-[13px] font-medium text-[#4f46e5] no-underline rounded-lg px-3 py-1.5 border border-transparent transition-colors hover:bg-white/70 hover:border-[#e6e9f3] hover:shadow-sm">Review all candidates →</a>
+        <a href="#" onClick={goToPosition} className="text-[12.5px] font-medium text-[#4f46e5] no-underline rounded-lg px-3 py-1.5 border border-transparent transition-colors hover:bg-white/70 hover:border-[#e6e9f3] hover:shadow-sm">Review all candidates →</a>
       </div>
     </div>
   );
@@ -1477,13 +1473,12 @@ function Sparkline({ data, h = 30 }: { data: number[]; h?: number }) {
   );
 }
 
-/* Weekly activity — a single block with the four key outputs + trend lines.
-   `weekIndex` (0 = current week … 3 = three weeks back) slides the window. */
-function WeeklyActivityCard({ data, weekIndex, weekLabel }: { data: ActivityStat[]; weekIndex: number; weekLabel: string }) {
-  const endIdx = (ACTIVITY_HISTORY - 1) - weekIndex; // last visible point = selected week
+/* Weekly activity — a single block with the four key outputs + trend lines. */
+function WeeklyActivityCard({ data }: { data: ActivityStat[] }) {
+  const endIdx = ACTIVITY_HISTORY - 1; // last visible point = current week
   return (
     <div className="rounded-xl border border-white/[0.08] bg-[#111a3c] p-5 min-h-0 flex flex-col">
-      <p className="text-[11px] uppercase tracking-[0.14em] font-semibold text-[#818cf8]">Activity · {weekLabel}</p>
+      <p className="text-[11px] uppercase tracking-[0.14em] font-semibold text-[#818cf8]">Activity · This Week</p>
       <p className="text-[14px] font-semibold text-white mt-1">Outputs vs. previous weeks</p>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-6 mt-5">
@@ -1688,8 +1683,13 @@ export function PipelineBoard({ positions, hideFilter = false, restrictPosition 
         </div>
       </div>
 
-      {/* columns — responsive grid lanes that always fill the available width */}
-      <div className="grid gap-4 pb-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+      {/* columns — six lanes with a fixed minimum width: they grow to fill wide
+          monitors, and the board scrolls horizontally instead of squishing on
+          smaller screens */}
+      <div
+        className="grid gap-4 pb-2 overflow-x-auto [&::-webkit-scrollbar]:hidden"
+        style={{ gridTemplateColumns: `repeat(${KSTAGES.length}, minmax(250px, 1fr))`, scrollbarWidth: 'none' }}
+      >
         {KSTAGES.map(stage => {
           const items = visible.filter(c => c.stage === stage.key);
           const isOver = overStage === stage.key;
@@ -1780,11 +1780,6 @@ export default function Dashboard() {
   const [statFilter, setStatFilter] = useState<StatKey>('all');
   const locations = locationsFor(statFilter);
 
-  const [weekId, setWeekId] = useState(WEEKS[0].id);
-  const [weekOpen, setWeekOpen] = useState(false);
-  const weekIndex = WEEKS.findIndex(w => w.id === weekId);
-  const week = WEEKS[weekIndex];
-
   const selectedIdx = selected ? POSITIONS.findIndex(p => p.title === selected) : -1;
   const selectedPos = selectedIdx >= 0 ? POSITIONS[selectedIdx] : null;
   const selectedCandidates = selectedPos ? ALL_CANDIDATES.filter(c => c.position === selectedPos.title) : [];
@@ -1802,13 +1797,13 @@ export default function Dashboard() {
 
   /* Positions with focus data render the larger PositionFocusCard; the rest use
      the standard clickable card. */
-  const renderPositionCard = (p: Pos) => {
+  const renderPositionCard = (p: Pos, fullWidth = false) => {
     const focus = FOCUS_BY_TITLE[p.title];
     // Offset each position's funnel animation so the three cards look distinct.
     const phase = POSITIONS.findIndex(x => x.title === p.title) * 1.7;
     return focus
-      ? <PositionFocusCard key={p.title} p={p} d={focus} onSelect={() => setSelected(p.title)} phase={phase} weekIndex={weekIndex} />
-      : <PositionCard key={p.title} p={p} onSelect={() => setSelected(p.title)} />;
+      ? <PositionFocusCard key={p.title} p={p} d={focus} onSelect={() => setSelected(p.title)} phase={phase} fullWidth={fullWidth} />
+      : <PositionCard key={p.title} p={p} onSelect={() => setSelected(p.title)} fullWidth={fullWidth} />;
   };
 
   return (
@@ -1820,8 +1815,7 @@ export default function Dashboard() {
           className="relative rounded-2xl border border-white/[0.08] px-5 sm:px-7 py-5 flex items-center justify-between gap-x-8 gap-y-5 flex-wrap"
           style={{ background: 'linear-gradient(120deg, #151e4a 0%, #1b2456 46%, #251a54 100%)' }}
         >
-          {/* soft momentum glow — clipped to the card so it can't spill, while the
-              card itself keeps overflow visible so the week dropdown isn't cut off */}
+          {/* soft momentum glow — clipped to the card so it can't spill */}
           <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
             <div className="absolute -top-24 -right-12 w-[360px] h-[360px] rounded-full" style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.28), transparent 70%)' }} />
           </div>
@@ -1835,46 +1829,14 @@ export default function Dashboard() {
             <h1 className="mt-1.5 text-[26px] leading-tight font-bold tracking-tight text-white">Talent Pipeline</h1>
           </div>
 
-          {/* metrics + week selector */}
+          {/* metrics */}
           <div className="relative z-10 flex items-center gap-x-5 sm:gap-7 gap-y-4 flex-wrap">
             <div className="flex items-center gap-x-5 sm:gap-7">
-              <HeroMetric label="Active Positions" value={week.active} />
+              <HeroMetric label="Active Positions" value={HERO_METRICS.active} />
               <span className="w-px h-9 bg-white/[0.10]" />
-              <HeroMetric label="Pipeline Growth" value={week.growth} delta={week.growthDelta} />
+              <HeroMetric label="Pipeline Growth" value={HERO_METRICS.growth} delta={HERO_METRICS.growthDelta} />
               <span className="w-px h-9 bg-white/[0.10]" />
-              <HeroMetric label="Ready to Interview" value={week.ready} />
-            </div>
-
-            {/* calendar-week selector */}
-            <div className="relative">
-              <button
-                onClick={() => setWeekOpen(o => !o)}
-                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 text-[13px] font-medium text-white transition-colors hover:bg-white/10"
-              >
-                <CalIcon />
-                {week.label}
-                <svg className={`w-4 h-4 text-[#94a3b8] transition-transform ${weekOpen ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
-              </button>
-
-              {weekOpen && (
-                <>
-                  <div className="fixed inset-0 z-20" onClick={() => setWeekOpen(false)} />
-                  <div className="absolute right-0 top-full mt-2 z-30 w-52 rounded-xl border border-white/10 bg-[#141d45] shadow-[0_16px_40px_rgba(0,0,0,0.45)] p-1.5">
-                    {WEEKS.map(w => (
-                      <button
-                        key={w.id}
-                        onClick={() => { setWeekId(w.id); setWeekOpen(false); }}
-                        className={`w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
-                          w.id === weekId ? 'bg-[#4f46e5] text-white' : 'text-[#cbd5e1] hover:bg-white/[0.06]'
-                        }`}
-                      >
-                        <span className="text-[13px] font-medium">{w.label}</span>
-                        <span className={`text-[11px] ${w.id === weekId ? 'text-white/70' : 'text-[#94a3b8]'}`}>{w.range}</span>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
+              <HeroMetric label="Ready to Interview" value={HERO_METRICS.ready} />
             </div>
           </div>
         </div>
@@ -1884,7 +1846,7 @@ export default function Dashboard() {
       <div className="flex-1 flex min-h-0 items-stretch">
 
         {/* ── Zone 2 — Main content ── */}
-        <main className="flex-1 min-w-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+        <main className="flex-1 min-w-0 overflow-y-auto page-top-fade px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
 
           {/* A. Position Overview — click a card to open its candidate strip */}
           <section>
@@ -1895,7 +1857,7 @@ export default function Dashboard() {
                 {/* Row above: positions that come before the selected one */}
                 {beforePositions.length > 0 && (
                   <div className={`${SCROLL_ROW} items-start -mx-2 px-2 pt-3 pb-4 animate-fade-scale-in`} style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory' }}>
-                    {beforePositions.map(renderPositionCard)}
+                    {beforePositions.map(p => renderPositionCard(p))}
                   </div>
                 )}
 
@@ -1915,7 +1877,7 @@ export default function Dashboard() {
                   </button>
 
                   <div className="shrink-0" style={{ width: 'clamp(340px, 30vw, 460px)' }}>
-                    <PositionDetails p={selectedPos} phase={selectedIdx * 1.7} weekIndex={weekIndex} />
+                    <PositionDetails p={selectedPos} phase={selectedIdx * 1.7} />
                   </div>
 
                   <div className="w-px bg-[#e2e8f0] ml-5 self-stretch shrink-0" />
@@ -1943,13 +1905,15 @@ export default function Dashboard() {
                 {/* Row below: positions that come after the selected one */}
                 {afterPositions.length > 0 && (
                   <div className={`${SCROLL_ROW} items-start -mx-2 px-2 pt-3 pb-4 mt-2 animate-fade-scale-in`} style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory' }}>
-                    {afterPositions.map(renderPositionCard)}
+                    {afterPositions.map(p => renderPositionCard(p))}
                   </div>
                 )}
               </>
             ) : (
+              /* Horizontal scroll row — fixed-width cards, scrolls right when they
+                 overflow, flush with the header's left edge. */
               <div className={`${SCROLL_ROW} items-start -mx-2 px-2 pt-3 pb-4`} style={{ scrollbarWidth: 'none', scrollSnapType: 'x mandatory' }}>
-                {POSITIONS.map(renderPositionCard)}
+                {POSITIONS.map(p => renderPositionCard(p))}
               </div>
             )}
           </section>
@@ -1979,7 +1943,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 pt-1 items-stretch">
               {/* Left column: two blocks split exactly 50/50 over the full height */}
               <div className="grid grid-rows-2 gap-6 h-full">
-                <WeeklyActivityCard data={WEEKLY_ACTIVITY_BY[statFilter]} weekIndex={weekIndex} weekLabel={week.label} />
+                <WeeklyActivityCard data={WEEKLY_ACTIVITY_BY[statFilter]} />
                 <DropOffCard d={DROPOFF_BY[statFilter]} />
               </div>
 

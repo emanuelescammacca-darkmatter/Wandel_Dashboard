@@ -94,7 +94,7 @@ export default function PositionWorkspace() {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-auto page-top-fade">
         {tab === 'candidate' && <CandidatesPane position={position} />}
         {tab === 'comparison' && <ComparisonView position={position} />}
         {tab === 'job-description' && <JobDescriptionSectionView position={position} />}

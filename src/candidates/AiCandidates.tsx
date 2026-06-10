@@ -185,7 +185,7 @@ export default function AiCandidates() {
   const fmt = (d: string) => new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto bg-[#f5f5f5] p-2.5 gap-2.5">
+    <div className="flex-1 flex flex-col overflow-y-auto page-top-fade bg-[#f5f5f5] p-2.5 gap-2.5">
 
       {/* ── Title ── */}
       <div className="shrink-0 pl-3">

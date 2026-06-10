@@ -214,6 +214,13 @@
   background-color: rgba(255, 255, 255, 0.7);
 }
 
+/* Very light top fade for main page scroll areas (Dashboard, Positions, Candidates) —
+   content dissolves softly under the top edge while scrolling instead of being hard-cut. */
+.page-top-fade {
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.2) 0, #000 32px);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.2) 0, #000 32px);
+}
+
 /* Soft fade (top & bottom) for the job-description page body, so content scrolls off
    gently instead of hitting a hard edge. */
 .doc-scroll-fade {
