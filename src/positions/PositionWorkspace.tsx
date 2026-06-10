@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { mockPositions, mockCandidates } from '../data/mockData';
 import { WaveBackground } from '../components/SophiaChrome';
 import { PipelineBoard } from '../dashboard/Dashboard';
+import { TALENT, STAGES, useStages, stageOf, matchOf, type Stage } from '../lib/talentStore';
 import type { Position, PositionStatus } from '../types';
 
 type Tab = 'candidate' | 'comparison' | 'job-description';
@@ -13,25 +14,17 @@ const TABS: [Tab, string][] = [
   ['job-description', 'Job Description'],
 ];
 
-/* ── Candidate status — mirrors the active stages of the Candidate Pipeline ── */
-type StatusKey = 'new' | 'shortlist' | 'interview' | 'offer' | 'hired';
-const STATUS_OPTS: { key: StatusKey; label: string; cls: string; dot: string }[] = [
-  { key: 'new',       label: 'New',            cls: 'text-sky-300 bg-sky-500/15 border-sky-500/30',         dot: '#38bdf8' },
-  { key: 'shortlist', label: 'Shortlisted',    cls: 'text-indigo-300 bg-indigo-500/15 border-indigo-500/30', dot: '#818cf8' },
-  { key: 'interview', label: 'Interviewing',   cls: 'text-violet-300 bg-violet-500/15 border-violet-500/30', dot: '#c084fc' },
-  { key: 'offer',     label: 'Offer Extended', cls: 'text-amber-300 bg-amber-500/15 border-amber-500/30',    dot: '#fbbf24' },
-  { key: 'hired',     label: 'Hired',          cls: 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30', dot: '#34d399' },
-];
-const STATUS_BY_ID: Record<string, StatusKey> = {
-  '1': 'interview', '2': 'offer', '3': 'shortlist', '4': 'new', '5': 'new', '6': 'shortlist', '7': 'hired', '8': 'interview', '9': 'new',
+/* ── Candidate status — the canonical pipeline stages from the talent store.
+   Stage values are read live, so kanban moves and profile evaluations are
+   reflected here immediately. ── */
+const STATUS_PILL: Record<Stage, { cls: string; dot: string }> = {
+  rejected:  { cls: 'text-rose-300 bg-rose-500/15 border-rose-500/30',        dot: '#fb7185' },
+  new:       { cls: 'text-sky-300 bg-sky-500/15 border-sky-500/30',           dot: '#38bdf8' },
+  shortlist: { cls: 'text-indigo-300 bg-indigo-500/15 border-indigo-500/30',  dot: '#818cf8' },
+  interview: { cls: 'text-violet-300 bg-violet-500/15 border-violet-500/30',  dot: '#c084fc' },
+  offer:     { cls: 'text-amber-300 bg-amber-500/15 border-amber-500/30',     dot: '#fbbf24' },
+  hired:     { cls: 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30', dot: '#34d399' },
 };
-const statusOf = (id: string): StatusKey => STATUS_BY_ID[id] ?? 'new';
-
-/* Position fit score (mock) — the single most useful at-a-glance overview metric. */
-const MATCH_BY_ID: Record<string, number> = {
-  '1': 92, '2': 87, '3': 79, '4': 74, '5': 68, '6': 61, '7': 83, '8': 71, '9': 65,
-};
-const matchOf = (id: string): number => MATCH_BY_ID[id] ?? 70;
 
 const statusStyles: Record<PositionStatus, string> = {
   'open':        'border border-emerald-500/30 text-emerald-300 bg-emerald-500/15',
@@ -106,14 +99,15 @@ export default function PositionWorkspace() {
 // ── Candidates pane — list/kanban view toggle ─────────────────────────────────
 
 const VIEW_OPTS: { key: 'list' | 'kanban'; label: string; icon: string }[] = [
-  { key: 'list',   label: 'Liste',  icon: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01' },
+  { key: 'list',   label: 'List',   icon: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01' },
   { key: 'kanban', label: 'Kanban', icon: 'M4 4h4.5v16H4zM9.75 4h4.5v10h-4.5zM15.5 4H20v13h-4.5z' },
 ];
 
 function CandidatesPane({ position }: { position: Position }) {
   const [view, setView] = useState<'list' | 'kanban'>('list');
-  const [statusFilter, setStatusFilter] = useState<StatusKey | 'all'>('all');
-  const total = mockCandidates.slice(0, Math.max(position.candidateCount, 1)).length;
+  const [statusFilter, setStatusFilter] = useState<Stage | 'all'>('all');
+  // Only candidates actually matched to this position (MECE with the kanban board).
+  const total = mockCandidates.filter(c => c.jobTitle === position.title).length;
 
   return (
     <div className="px-5 pt-5 pb-8 flex flex-col gap-4">
@@ -148,11 +142,11 @@ function CandidatesPane({ position }: { position: Position }) {
               <select
                 aria-label="Status filter"
                 value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value as StatusKey | 'all')}
+                onChange={e => setStatusFilter(e.target.value as Stage | 'all')}
                 className="appearance-none bg-white/[0.04] border border-white/10 rounded-xl text-[12px] font-semibold text-white pl-3.5 pr-9 h-[38px] outline-none hover:border-white/25 focus:border-indigo-400/50 transition-colors cursor-pointer"
               >
                 <option value="all">Status: All</option>
-                {STATUS_OPTS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+                {STAGES.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
               </select>
               <svg className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
             </div>
@@ -161,7 +155,7 @@ function CandidatesPane({ position }: { position: Position }) {
       </div>
 
       {view === 'list'
-        ? <CandidateTable candidateCount={position.candidateCount} statusFilter={statusFilter} />
+        ? <CandidateTable positionTitle={position.title} statusFilter={statusFilter} />
         : <PipelineBoard positions={[]} hideFilter restrictPosition={position.title} />}
     </div>
   );
@@ -173,12 +167,13 @@ function CandidatesPane({ position }: { position: Position }) {
 const COLS = 'grid-cols-[1.4fr_1.5fr_1.15fr_1fr_0.8fr_1.1fr_1fr]';
 const HEADERS = ['Candidate', 'Job Title', 'Status', 'Earliest Start', 'Match', 'Location', 'Salary'];
 
-function StatusPill({ status }: { status: StatusKey }) {
-  const opt = STATUS_OPTS.find(o => o.key === status) ?? STATUS_OPTS[0];
+function StatusPill({ status }: { status: Stage }) {
+  const meta = STAGES.find(s => s.key === status) ?? STAGES[1];
+  const pill = STATUS_PILL[status];
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border ${opt.cls}`}>
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: opt.dot }} />
-      {opt.label}
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border ${pill.cls}`}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: pill.dot }} />
+      {meta.label}
     </span>
   );
 }
@@ -201,12 +196,14 @@ function fmtSalary(s: string | null): React.ReactNode {
 
 const PAGE_SIZE = 10;
 
-function CandidateTable({ candidateCount, statusFilter }: { candidateCount: number; statusFilter: StatusKey | 'all' }) {
+function CandidateTable({ positionTitle, statusFilter }: { positionTitle: string; statusFilter: Stage | 'all' }) {
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
+  const stages = useStages();
 
-  const all = mockCandidates.slice(0, Math.max(candidateCount, 1));
-  const filtered = statusFilter === 'all' ? all : all.filter(c => statusOf(c.id) === statusFilter);
+  // Candidates matched to this position; status read live from the talent store.
+  const all = mockCandidates.filter(c => c.jobTitle === positionTitle);
+  const filtered = statusFilter === 'all' ? all : all.filter(c => stageOf(stages, c.id) === statusFilter);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages - 1);
   const candidates = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
@@ -249,7 +246,7 @@ function CandidateTable({ candidateCount, statusFilter }: { candidateCount: numb
                 </div>
                 {/* Status */}
                 <div className="py-3 flex items-center">
-                  <StatusPill status={statusOf(c.id)} />
+                  <StatusPill status={stageOf(stages, c.id)} />
                 </div>
                 {/* Earliest Start */}
                 <div className="py-3 flex items-center">
@@ -309,15 +306,16 @@ function CandidateTable({ candidateCount, statusFilter }: { candidateCount: numb
 // are referenced footnote-style — a numbered chip on the bullet maps to the same
 // number in Sophia's panel, with two-way hover highlighting and click-to-jump.
 
-/* Sophia's screening questions, in call order. */
+/* Sophia's screening questions, in call order (asked in German on the call,
+   displayed in English here). */
 const JD_QUESTIONS: { id: number; text: string }[] = [
-  { id: 1, text: 'Welche Ausbildung haben Sie abgeschlossen – und ist sie in Deutschland anerkannt?' },
-  { id: 2, text: 'Besitzen Sie die Befähigung, DGUV-V3-Prüfungen durchzuführen (Ausbildung oder Zertifikat zur Elektrofachkraft)?' },
-  { id: 3, text: 'Haben Sie Erfahrung im Außendienst und/oder mit Kaffeemaschinen?' },
-  { id: 4, text: 'Trinken Sie Kaffee – bzw. sind Sie bereit, bei Inbetriebnahme und Reparatur Kaffee zu probieren?' },
-  { id: 5, text: 'Was ist Ihr frühestmögliches Eintrittsdatum?' },
-  { id: 6, text: 'Wie sind Ihre Gehaltsvorstellungen (brutto/Monat)?' },
-  { id: 7, text: 'Welche Fragen haben Sie an uns?' },
+  { id: 1, text: 'Which vocational training have you completed — and is it recognized in Germany?' },
+  { id: 2, text: 'Are you qualified to carry out DGUV V3 inspections (training or certification as an electrician)?' },
+  { id: 3, text: 'Do you have experience in field service and/or with coffee machines?' },
+  { id: 4, text: 'Do you drink coffee — and are you willing to taste coffee during commissioning and repairs?' },
+  { id: 5, text: 'What is your earliest possible start date?' },
+  { id: 6, text: 'What is your salary expectation (gross/month)?' },
+  { id: 7, text: 'What questions do you have for us?' },
 ];
 
 type JdBullet = { text: string; q?: number };
@@ -327,65 +325,65 @@ type JdSection = { id: string; title: string; icon: string; accent: string; bull
    (and which questions branch off them) change per position. */
 const JD_SECTIONS: JdSection[] = [
   {
-    id: 'aufgaben', title: 'Aufgaben', accent: '#818cf8',
+    id: 'aufgaben', title: 'Responsibilities', accent: '#818cf8',
     icon: 'M9 4h6a2 2 0 0 1 2 2v1h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3V6a2 2 0 0 1 2-2zM9 7h6V6H9v1z',
     bullets: [
-      { text: 'Ganzheitliche Betreuung von Heißgetränkeautomaten bei Geschäftskunden (Bäckereien, Gastronomie, Hotellerie, Gemeinschaftsverpflegung)' },
-      { text: 'Inbetriebnahme, regelmäßige Wartung sowie Störungsbehebung und Instandsetzung', q: 4 },
-      { text: 'Unterstützung der Kunden bei Pflege und Handhabung der Geräte' },
-      { text: 'Durchführung von Prüfungen nach der DGUV V3-Vorschrift' },
-      { text: 'Verwaltung des Lagerbestands im Dienstfahrzeug und Sicherstellung des einwandfreien Betriebs' },
+      { text: 'End-to-end care of hot-beverage machines at business customers (bakeries, gastronomy, hotels, communal catering)' },
+      { text: 'Commissioning, regular maintenance, troubleshooting and repair', q: 4 },
+      { text: 'Supporting customers with care and handling of the machines' },
+      { text: 'Carrying out inspections according to the DGUV V3 regulation' },
+      { text: 'Managing the spare-parts stock in the service vehicle and ensuring smooth operations' },
     ],
   },
   {
-    id: 'ausbildung', title: 'Ausbildung', accent: '#22d3ee',
+    id: 'ausbildung', title: 'Education', accent: '#22d3ee',
     icon: 'M22 10L12 5 2 10l10 5 10-5zM6 12v5c0 2 3 3 6 3s6-1 6-3v-5',
     bullets: [
-      { text: 'Quereinsteiger:innen willkommen' },
-      { text: 'Must-have: abgeschlossene, in Deutschland anerkannte Ausbildung in einem technisch-handwerklichen Beruf', q: 1 },
-      { text: 'Ideal: elektrotechnische Aus- oder Weiterbildung (Elektriker, Servicetechniker o. Ä.)' },
+      { text: 'Career changers welcome' },
+      { text: 'Must-have: completed vocational training in a technical trade, recognized in Germany', q: 1 },
+      { text: 'Ideal: electrical training or further education (electrician, service technician or similar)' },
     ],
   },
   {
-    id: 'kompetenzen', title: 'Kompetenzen & Berufserfahrung', accent: '#a855f7',
+    id: 'kompetenzen', title: 'Skills & Experience', accent: '#a855f7',
     icon: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
     bullets: [
-      { text: 'Eignung zur DGUV V3-Prüfung an elektrischen Anlagen und Geräten wünschenswert', q: 2 },
-      { text: 'Berufserfahrung im Außen- oder Kundendienst wünschenswert', q: 3 },
-      { text: 'Spaß am Umgang mit Menschen und ausgeprägtes Kommunikationsgeschick' },
+      { text: 'Qualification for DGUV V3 inspections of electrical systems and equipment desirable', q: 2 },
+      { text: 'Professional experience in field or customer service desirable', q: 3 },
+      { text: 'Enjoys working with people and communicates confidently' },
     ],
   },
   {
-    id: 'rahmendaten', title: 'Rahmendaten', accent: '#f59e0b',
+    id: 'rahmendaten', title: 'Key Facts', accent: '#f59e0b',
     icon: 'M9 4h6v3H9zM7 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1M8 12h8M8 16h6',
     bullets: [
-      { text: 'Start ab sofort · zunächst auf 24 Monate befristet (im Regelfall Entfristung)', q: 5 },
-      { text: 'Vollzeit, 40 Std./Woche · Arbeitszeit 8:00–17:00 Uhr' },
-      { text: 'Bereitschaftsdienst ca. jedes 12./13. Wochenende' },
-      { text: 'Gehalt: 3.200 € in der Probezeit, danach 3.500 € + ca. 280 € netto Verpflegungspauschale', q: 6 },
-      { text: 'Strukturierte Einarbeitung in den ersten 12 Wochen, teils mit Übernachtung (Theoriephase)' },
+      { text: 'Start immediately · initially limited to 24 months (usually made permanent)', q: 5 },
+      { text: 'Full-time, 40 h/week · working hours 8:00–17:00' },
+      { text: 'On-call duty roughly every 12th/13th weekend' },
+      { text: 'Salary: 3,200 € during probation, then 3,500 € + approx. 280 € net meal allowance', q: 6 },
+      { text: 'Structured onboarding in the first 12 weeks, partly with overnight stays (theory phase)' },
     ],
   },
   {
     id: 'benefits', title: 'Benefits', accent: '#34d399',
     icon: 'M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z',
     bullets: [
-      { text: 'Mitarbeiterrabatt im Tchibo-Onlineshop (15 %)' },
-      { text: 'Regelmäßige Teamevents (Sommer- und Winterfest)' },
-      { text: 'Zuschuss zur Nutzung von Fitnessstudios' },
-      { text: 'Teilnahme am JobRad' },
-      { text: 'Übernahme der Garagen-/Stellplatzmiete' },
+      { text: 'Employee discount in the Tchibo online shop (15%)' },
+      { text: 'Regular team events (summer and winter party)' },
+      { text: 'Gym membership subsidy' },
+      { text: 'JobRad bike-leasing program' },
+      { text: 'Garage / parking-space rent covered' },
     ],
   },
 ];
 
 /* Hard facts every recruiter scans for first — surfaced in the hero strip. */
 const JD_FACTS: { icon: string; label: string; value: string }[] = [
-  { icon: 'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', label: 'Standort', value: 'Großraum München' },
-  { icon: 'M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z', label: 'Deutsch', value: 'Mind. B2' },
-  { icon: 'M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', label: 'Start', value: 'Ab sofort' },
-  { icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2', label: 'Pensum', value: '40 Std. / Woche' },
-  { icon: 'M2 7h20v10H2zM12 14.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z', label: 'Gehalt', value: '3.200–3.500 € + Spesen' },
+  { icon: 'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', label: 'Location', value: 'Greater Munich' },
+  { icon: 'M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z', label: 'German', value: 'B2 minimum' },
+  { icon: 'M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', label: 'Start', value: 'Immediately' },
+  { icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2', label: 'Hours', value: '40 h / week' },
+  { icon: 'M2 7h20v10H2zM12 14.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z', label: 'Salary', value: '3.200–3.500 € + expenses' },
 ];
 
 function SparkGlyph() {
@@ -407,7 +405,7 @@ function JdHero({ position }: { position: Position }) {
           </div>
           <div className="inline-flex items-center gap-2.5 text-[12px] text-indigo-100 bg-indigo-500/15 border border-indigo-400/25 rounded-xl px-3.5 py-2.5">
             <span className="w-7 h-7 rounded-lg bg-indigo-500/25 border border-indigo-400/30 text-indigo-200 flex items-center justify-center shrink-0"><SparkGlyph /></span>
-            <span>Sophia screent mit <span className="font-bold text-white">{JD_QUESTIONS.length}</span> Fragen aus diesem Briefing</span>
+            <span>Sophia screens with <span className="font-bold text-white">{JD_QUESTIONS.length}</span> questions from this briefing</span>
           </div>
         </div>
         <div className="mt-5 flex flex-wrap gap-2.5">
@@ -488,7 +486,7 @@ function JobDescriptionSectionView({ position }: { position: Position }) {
                           {bl.text}
                           {bl.q != null && (
                             <span
-                              title={open ? 'Frage einklappen' : 'Sophias Frage anzeigen'}
+                              title={open ? 'Collapse question' : "Show Sophia's question"}
                               className={`ml-2 inline-flex items-center justify-center align-middle w-[19px] h-[19px] rounded-md transition-all ${open ? 'bg-indigo-400 text-[#0b1437] shadow-[0_0_12px_rgba(129,140,248,0.55)]' : 'bg-indigo-500/15 text-indigo-300 border border-indigo-400/30'}`}
                             >
                               <SparkGlyph />
@@ -509,7 +507,7 @@ function JobDescriptionSectionView({ position }: { position: Position }) {
                       {open && bl.q != null && (
                         <blockquote className="ml-[26px] my-1.5 pl-3.5 border-l-2 border-indigo-400/60">
                           <p className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.16em] font-semibold text-indigo-300/80">
-                            <SparkGlyph /> Sophia fragt im Screening
+                            <SparkGlyph /> Sophia asks in the screening
                           </p>
                           <p className="text-[13px] text-[#dbe2f0] leading-snug mt-1">{questionById.get(bl.q)}</p>
                         </blockquote>
@@ -526,14 +524,14 @@ function JobDescriptionSectionView({ position }: { position: Position }) {
             <section className="mt-9">
               <div className="flex items-center gap-3">
                 <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-indigo-500/15 border border-indigo-400/30 text-indigo-300"><SparkGlyph /></span>
-                <h3 className="text-[16px] font-bold text-white tracking-tight">Zum Abschluss</h3>
+                <h3 className="text-[16px] font-bold text-white tracking-tight">Closing questions</h3>
                 <span className="flex-1 h-px bg-white/[0.07]" />
               </div>
               <div className="mt-3.5 flex flex-col gap-3">
                 {closingQuestions.map(qq => (
                   <blockquote key={qq.id} className="pl-3.5 border-l-2 border-indigo-400/60">
                     <p className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.16em] font-semibold text-indigo-300/80">
-                      <SparkGlyph /> Sophia fragt im Screening
+                      <SparkGlyph /> Sophia asks in the screening
                     </p>
                     <p className="text-[13px] text-[#dbe2f0] leading-snug mt-1">{qq.text}</p>
                   </blockquote>
@@ -550,74 +548,58 @@ function JobDescriptionSectionView({ position }: { position: Position }) {
 // ── Comparison — decision matrix built from the data we actually collect ──────
 //
 // Categories are derived from the two real data sources:
-//   · Job Description  →  Must-haves (K.o.-Kriterien), Budget, Einsatzgebiet
-//   · Sophia-Screening →  Erfahrung, Kommunikation, Gehaltswunsch, Startdatum
+//   · Job Description   →  must-haves (knock-out criteria), budget, service area
+//   · Sophia screening  →  experience, German level, salary expectation, start date
 // The page answers the HR team's three questions in one view:
-// Wer erfüllt die K.o.-Kriterien? · Wer passt zu den Konditionen? · Wen laden wir ein?
+// Who meets the knock-out criteria? · Who fits the conditions? · Whom do we invite?
 
 type Tri = boolean | 'partial';
-type GermanLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | 'Muttersprache';
+type GermanLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | 'Native';
 type CompRow = {
-  id: string; name: string; current: string;
-  match: number;                                   // overall fit, 0–100
-  must: { ausbildung: Tri; dguv: Tri; deutsch: Tri };
-  erfahrung: number;                               // 0–10, from CV + call
-  deutsch: GermanLevel;                            // CEFR level, assessed in the call
-  gehalt: number;                                  // expectation €/month
+  id: string;                                      // canonical candidate id (talent store)
+  current: string;                                 // current / last role
+  must: { training: Tri; dguv: Tri; german: Tri };
+  experience: number;                              // 0–10, from CV + call
+  german: GermanLevel;                             // CEFR level, assessed in the call
+  salary: number;                                  // expectation €/month
   start: string; startDays: number;
-  mobil: string;                                   // residence + distance
 };
 
 const COMP_BUDGET = 3500; // target salary after probation (from the JD)
 
+/* Per-candidate screening results for THIS position. Identity (name, city,
+   distance) and the match score come from the canonical talent store — only
+   call-derived assessment data lives here. */
 const COMP_ROWS: CompRow[] = [
   {
-    id: '2', name: 'Andi Kufner', current: 'Servicetechniker, Vending-Automaten', match: 92,
-    must: { ausbildung: true, dguv: true, deutsch: true },
-    erfahrung: 9, deutsch: 'Muttersprache', gehalt: 3400, start: '01.07.2026', startDays: 21,
-    mobil: 'München · 12 km',
+    id: '2', current: 'Service technician, vending machines',
+    must: { training: true, dguv: true, german: true },
+    experience: 9, german: 'Native', salary: 3400, start: 'Jul 1, 2026', startDays: 21,
   },
   {
-    id: '7', name: 'Klaus Müller', current: 'Elektriker, Gebäudetechnik', match: 87,
-    must: { ausbildung: true, dguv: 'partial', deutsch: true },
-    erfahrung: 8, deutsch: 'Muttersprache', gehalt: 3300, start: '15.07.2026', startDays: 35,
-    mobil: 'Dachau · 18 km',
+    id: '1', current: 'Service technician, refrigeration',
+    must: { training: true, dguv: true, german: true },
+    experience: 7, german: 'Native', salary: 3650, start: 'Aug 1, 2026', startDays: 52,
   },
   {
-    id: '1', name: 'Marcel Weber', current: 'Servicetechniker, Kältetechnik', match: 84,
-    must: { ausbildung: true, dguv: true, deutsch: true },
-    erfahrung: 7, deutsch: 'Muttersprache', gehalt: 3650, start: '01.08.2026', startDays: 52,
-    mobil: 'München · 8 km',
+    id: '5', current: 'Car mechatronics technician',
+    must: { training: true, dguv: false, german: 'partial' },
+    experience: 7, german: 'B1', salary: 3100, start: 'Immediately', startDays: 0,
   },
   {
-    id: '8', name: 'Sophie Bauer', current: 'Mechatronikerin, Produktionsanlagen', match: 76,
-    must: { ausbildung: true, dguv: 'partial', deutsch: true },
-    erfahrung: 6, deutsch: 'Muttersprache', gehalt: 3200, start: 'Sofort', startDays: 0,
-    mobil: 'Freising · 32 km',
+    id: '4', current: 'Industrial mechanic',
+    must: { training: true, dguv: false, german: true },
+    experience: 4, german: 'Native', salary: 3800, start: 'Sep 1, 2026', startDays: 83,
   },
   {
-    id: '5', name: 'Giovanni Rossi', current: 'KFZ-Mechatroniker', match: 67,
-    must: { ausbildung: true, dguv: false, deutsch: 'partial' },
-    erfahrung: 7, deutsch: 'B1', gehalt: 3100, start: 'Sofort', startDays: 0,
-    mobil: 'München · 10 km',
+    id: '6', current: 'Career changer, retail',
+    must: { training: false, dguv: false, german: true },
+    experience: 3, german: 'C1', salary: 3000, start: 'Immediately', startDays: 0,
   },
   {
-    id: '4', name: 'Andreas Gottschalk', current: 'Industriemechaniker', match: 59,
-    must: { ausbildung: true, dguv: false, deutsch: true },
-    erfahrung: 4, deutsch: 'Muttersprache', gehalt: 3800, start: '01.09.2026', startDays: 83,
-    mobil: 'Augsburg · 55 km',
-  },
-  {
-    id: '6', name: 'Niclas Gallas', current: 'Quereinsteiger, Einzelhandel', match: 48,
-    must: { ausbildung: false, dguv: false, deutsch: true },
-    erfahrung: 3, deutsch: 'C1', gehalt: 3000, start: 'Sofort', startDays: 0,
-    mobil: 'München · 15 km',
-  },
-  {
-    id: '3', name: 'Udo Alexander Brandt', current: 'Zerspanungsmechaniker', match: 38,
-    must: { ausbildung: true, dguv: false, deutsch: true },
-    erfahrung: 2, deutsch: 'Muttersprache', gehalt: 4200, start: '01.10.2026', startDays: 113,
-    mobil: 'Rosenheim · 62 km',
+    id: '3', current: 'Machining technician',
+    must: { training: true, dguv: false, german: true },
+    experience: 2, german: 'Native', salary: 4200, start: 'Oct 1, 2026', startDays: 113,
   },
 ];
 
@@ -629,15 +611,15 @@ function germanMeta(level: GermanLevel): { cls: string; dot: string } {
 }
 
 const MUST_DEFS: { key: keyof CompRow['must']; label: string; full: string }[] = [
-  { key: 'ausbildung', label: 'Ausbildung', full: 'Anerkannte technische Ausbildung' },
-  { key: 'dguv',       label: 'DGUV V3',    full: 'DGUV-V3-Befähigung' },
-  { key: 'deutsch',    label: 'Deutsch B2', full: 'Deutsch mind. B2' },
+  { key: 'training', label: 'Training',  full: 'Recognized technical training' },
+  { key: 'dguv',     label: 'DGUV V3',   full: 'DGUV V3 qualification' },
+  { key: 'german',   label: 'German B2', full: 'German B2 minimum' },
 ];
 
 /* Mini checklist row: explicit label + check / tilde / cross — unambiguous at a glance. */
 function MustCheck({ state, label, full }: { state: Tri; label: string; full: string }) {
   const color = state === true ? '#34d399' : state === 'partial' ? '#fbbf24' : '#fb7185';
-  const suffix = state === true ? 'erfüllt' : state === 'partial' ? 'teilweise erfüllt' : 'nicht erfüllt';
+  const suffix = state === true ? 'met' : state === 'partial' ? 'partially met' : 'not met';
   return (
     <span title={`${full}: ${suffix}`} className="flex items-center gap-1.5 cursor-default">
       <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
@@ -664,23 +646,25 @@ function matchColor(v: number) {
   return v >= 80 ? '#34d399' : v >= 60 ? '#fbbf24' : '#fb7185';
 }
 
-function salaryFit(gehalt: number): { label: string; color: string } {
-  if (gehalt <= COMP_BUDGET) return { label: 'im Budget', color: '#34d399' };
-  if (gehalt <= COMP_BUDGET + 500) return { label: 'verhandelbar', color: '#fbbf24' };
-  return { label: 'über Budget', color: '#fb7185' };
+function salaryFit(salary: number): { label: string; color: string } {
+  if (salary <= COMP_BUDGET) return { label: 'within budget', color: '#34d399' };
+  if (salary <= COMP_BUDGET + 500) return { label: 'negotiable', color: '#fbbf24' };
+  return { label: 'over budget', color: '#fb7185' };
 }
 
-type CompSortKey = 'name' | 'must' | 'erfahrung' | 'deutsch' | 'gehalt' | 'startDays' | 'mobil' | 'match';
+type CompSortKey = 'name' | 'must' | 'experience' | 'german' | 'salary' | 'startDays' | 'mobility' | 'match';
 
-const GERMAN_RANK: Record<GermanLevel, number> = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6, Muttersprache: 7 };
+const GERMAN_RANK: Record<GermanLevel, number> = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6, Native: 7 };
 
 /* Numeric sort value per column: must-haves count fulfilled (partial = 0.5), mobility uses the km distance. */
 function compSortValue(r: CompRow, key: CompSortKey): number | string {
+  const t = TALENT[r.id];
   switch (key) {
-    case 'name': return r.name;
+    case 'name': return t.name;
     case 'must': return MUST_DEFS.reduce((s, d) => s + (r.must[d.key] === true ? 1 : r.must[d.key] === 'partial' ? 0.5 : 0), 0);
-    case 'deutsch': return GERMAN_RANK[r.deutsch];
-    case 'mobil': return parseInt(r.mobil.match(/(\d+)\s*km/)?.[1] ?? '999', 10);
+    case 'german': return GERMAN_RANK[r.german];
+    case 'mobility': return parseInt(t.distance, 10) || 999;
+    case 'match': return t.match;
     default: return r[key];
   }
 }
@@ -704,7 +688,7 @@ function ComparisonView({ position }: { position: Position }) {
   // Default direction: "best first" — ascending where lower is better (salary, start, distance, name).
   const toggleSort = (key: CompSortKey) => {
     if (key === sortKey) setSortAsc(a => !a);
-    else { setSortKey(key); setSortAsc(key === 'gehalt' || key === 'startDays' || key === 'mobil' || key === 'name'); }
+    else { setSortKey(key); setSortAsc(key === 'salary' || key === 'startDays' || key === 'mobility' || key === 'name'); }
   };
 
   const SortHeader = ({ label, k, title }: { label: string; k: CompSortKey; title: string }) => (
@@ -721,11 +705,11 @@ function ComparisonView({ position }: { position: Position }) {
       <div className="rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-white/[0.06] flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-sm font-semibold text-white tracking-wide uppercase">Kandidatenvergleich</h2>
+            <h2 className="text-sm font-semibold text-white tracking-wide uppercase">Candidate Comparison</h2>
             <p className="text-[11.5px] text-slate-500 mt-0.5">{position.title}</p>
           </div>
           <p className="text-[10.5px] text-slate-500">
-            Must-haves &amp; Budget aus der Job Description · Scores aus dem Sophia-Screening
+            Must-haves &amp; budget from the job description · scores from the Sophia screening
           </p>
         </div>
 
@@ -733,32 +717,33 @@ function ComparisonView({ position }: { position: Position }) {
           <div className="min-w-[1080px]">
             {/* Header */}
             <div className={`grid ${COMP_COLS} gap-3 items-center px-5 py-2.5 text-[9.5px] font-semibold text-slate-500 border-b border-white/[0.06]`}>
-              <SortHeader label="Kandidat" k="name" title="Alphabetisch sortieren" />
-              <SortHeader label="Must-haves" k="must" title="K.o.-Kriterien aus der Job Description — sortiert nach Anzahl erfüllter Kriterien" />
-              <SortHeader label="Erfahrung" k="erfahrung" title="Relevante Außendienst-/Serviceerfahrung — bewertet aus CV und Sophia-Call" />
-              <SortHeader label="Deutsch" k="deutsch" title="Deutsch-Niveau (GER A1–C2 / Muttersprache) — sortiert nach Sprachlevel" />
-              <SortHeader label="Gehalt" k="gehalt" title={`Gehaltswunsch vs. Budget (${COMP_BUDGET.toLocaleString('de-DE')} € nach Probezeit)`} />
-              <SortHeader label="Start" k="startDays" title="Frühestmögliches Eintrittsdatum" />
-              <SortHeader label="Mobilität" k="mobil" title="Entfernung zum Einsatzgebiet — sortiert nach Nähe" />
-              <SortHeader label="Match" k="match" title="Gesamtpassung aus allen erhobenen Daten" />
+              <SortHeader label="Candidate" k="name" title="Sort alphabetically" />
+              <SortHeader label="Must-haves" k="must" title="Knock-out criteria from the job description — sorted by number of criteria met" />
+              <SortHeader label="Experience" k="experience" title="Relevant field-service experience — scored from CV and Sophia call" />
+              <SortHeader label="German" k="german" title="German level (CEFR A1–C2 / native) — sorted by language level" />
+              <SortHeader label="Salary" k="salary" title={`Salary expectation vs. budget (${COMP_BUDGET.toLocaleString('de-DE')} € after probation)`} />
+              <SortHeader label="Start" k="startDays" title="Earliest possible start date" />
+              <SortHeader label="Mobility" k="mobility" title="Distance to the service area — sorted by proximity" />
+              <SortHeader label="Match" k="match" title="Overall fit from all collected data" />
               <span />
             </div>
 
             {/* Rows */}
             {rows.map(r => {
-              const fit = salaryFit(r.gehalt);
-              const de = germanMeta(r.deutsch);
+              const t = TALENT[r.id];
+              const fit = salaryFit(r.salary);
+              const de = germanMeta(r.german);
               return (
                 <div key={r.id} className="border-b border-white/[0.05] last:border-b-0">
                   <div className="hover:bg-white/[0.035] transition-colors">
                     <div className={`grid ${COMP_COLS} gap-3 items-center px-5 py-3`}>
-                      {/* Candidate */}
+                      {/* Candidate — identity from the talent store */}
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500/40 to-violet-500/40 border border-white/15 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
-                          {r.name.split(' ').map(p => p[0]).slice(0, 2).join('')}
+                          {t.name.split(' ').map(p => p[0]).slice(0, 2).join('')}
                         </span>
                         <div className="min-w-0">
-                          <p className="text-[13px] font-semibold text-white truncate">{r.name}</p>
+                          <p className="text-[13px] font-semibold text-white truncate">{t.name}</p>
                           <p className="text-[10.5px] text-slate-500 truncate">{r.current}</p>
                         </div>
                       </div>
@@ -767,14 +752,14 @@ function ComparisonView({ position }: { position: Position }) {
                         {MUST_DEFS.map(m => <MustCheck key={m.key} state={r.must[m.key]} label={m.label} full={m.full} />)}
                       </div>
                       {/* Experience */}
-                      <ScoreBar value={r.erfahrung} />
+                      <ScoreBar value={r.experience} />
                       {/* German level (CEFR) */}
                       <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-semibold border w-fit ${de.cls}`}>
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: de.dot }} />{r.deutsch}
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: de.dot }} />{r.german}
                       </span>
                       {/* Salary */}
                       <div>
-                        <p className="text-[12.5px] font-semibold text-white tabular-nums">{r.gehalt.toLocaleString('de-DE')} €</p>
+                        <p className="text-[12.5px] font-semibold text-white tabular-nums">{r.salary.toLocaleString('de-DE')} €</p>
                         <p className="flex items-center gap-1 text-[10px]" style={{ color: fit.color }}>
                           <span className="w-1.5 h-1.5 rounded-full" style={{ background: fit.color }} />{fit.label}
                         </p>
@@ -782,16 +767,16 @@ function ComparisonView({ position }: { position: Position }) {
                       {/* Start */}
                       <p className={`text-[12px] ${r.startDays === 0 ? 'text-emerald-300 font-semibold' : 'text-[#cbd5e1]'}`}>{r.start}</p>
                       {/* Mobility */}
-                      <p className="text-[11.5px] text-[#aeb8cc] leading-snug">{r.mobil}</p>
-                      {/* Match */}
-                      <p className="text-[19px] font-bold tabular-nums" style={{ color: matchColor(r.match) }}>{r.match}</p>
+                      <p className="text-[11.5px] text-[#aeb8cc] leading-snug">{t.city} · {t.distance}</p>
+                      {/* Match — same canonical score as table, cards and profile */}
+                      <p className="text-[19px] font-bold tabular-nums" style={{ color: matchColor(t.match) }}>{t.match}</p>
                       {/* Profile — always visible */}
                       <button
                         onClick={() => navigate(`/clients/positions/candidate/${r.id}`)}
-                        title="Vollständiges Profil ansehen"
+                        title="View full profile"
                         className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-indigo-300 border border-indigo-400/30 bg-indigo-500/10 hover:bg-indigo-500/25 rounded-lg px-2.5 py-1.5 transition-colors w-fit"
                       >
-                        Profil
+                        Profile
                         <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7M9 7h8v8" /></svg>
                       </button>
                     </div>
@@ -805,8 +790,8 @@ function ComparisonView({ position }: { position: Position }) {
 
       {/* Legend */}
       <p className="text-[10.5px] text-slate-500 px-1">
-        Must-haves aus der Job Description (✓ erfüllt · – teilweise · ✕ nicht erfüllt).
-        Erfahrung aus CV &amp; Sophia-Call (0–10) · Deutsch nach GER (A1–C2 / Muttersprache), eingeschätzt im Call. Budget: {COMP_BUDGET.toLocaleString('de-DE')} € nach Probezeit.
+        Must-haves from the job description (✓ met · – partially · ✕ not met).
+        Experience from CV &amp; Sophia call (0–10) · German per CEFR (A1–C2 / native), assessed in the call. Budget: {COMP_BUDGET.toLocaleString('de-DE')} € after probation.
       </p>
     </div>
   );

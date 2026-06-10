@@ -67,7 +67,7 @@ export default function ProfileAssessmentHero({ candidate, onBack, backLabel }: 
               <svg className="w-5 h-5 text-emerald-200" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-100">Unsere Einschätzung</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-100">Our Assessment</p>
             </div>
             <p className="text-lg leading-relaxed font-medium">{candidate.assessment}</p>
           </div>
@@ -80,27 +80,27 @@ export default function ProfileAssessmentHero({ candidate, onBack, backLabel }: 
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden lg:sticky lg:top-5">
             <CardHead icon={Icons.briefcase} title="Allgemeine Angaben" accent="text-emerald-500" />
             <div className="px-6 py-3 divide-y divide-gray-100">
-              <Fact icon={Icons.phone} label="Telefon" value={candidate.phoneNumber} />
+              <Fact icon={Icons.phone} label="Phone" value={candidate.phoneNumber} />
               <Fact icon={Icons.mail} label="E-Mail" value={candidate.email} />
               <Fact
                 icon={Icons.cake}
-                label="Geburtstag"
+                label="Birthday"
                 value={candidate.dateOfBirth ? `${formatDate(candidate.dateOfBirth)}${age ? ` · ${age} J.` : ''}` : null}
               />
-              <Fact icon={Icons.pin} label="Adresse" value={candidate.address} />
-              <Fact icon={Icons.globe} label="Nationalität" value={candidate.nationality} />
+              <Fact icon={Icons.pin} label="Address" value={candidate.address} />
+              <Fact icon={Icons.globe} label="Nationality" value={candidate.nationality} />
               <Fact
                 icon={Icons.language}
-                label="Deutschniveau"
+                label="German level"
                 value={candidate.germanLevel ? (
                   <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
                     {candidate.germanLevel}
                   </span>
                 ) : null}
               />
-              <Fact icon={Icons.car} label="Führerschein" value={driversLicenseLabel(candidate.driversLicense, candidate.licenseClasses)} />
-              <Fact icon={Icons.clock} label="Kündigungsfrist" value={candidate.noticePeriod} />
-              <Fact icon={Icons.euro} label="Gehaltswunsch" value={formatSalary(candidate.salary)} />
+              <Fact icon={Icons.car} label="Driver's licence" value={driversLicenseLabel(candidate.driversLicense, candidate.licenseClasses)} />
+              <Fact icon={Icons.clock} label="Notice period" value={candidate.noticePeriod} />
+              <Fact icon={Icons.euro} label="Salary expectation" value={formatSalary(candidate.salary)} />
             </div>
           </div>
 
@@ -131,7 +131,7 @@ export default function ProfileAssessmentHero({ candidate, onBack, backLabel }: 
 
               {/* Education */}
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                <CardHead icon={Icons.cap} title="Akademischer Werdegang" accent="text-emerald-500" />
+                <CardHead icon={Icons.cap} title="Education & Training" accent="text-emerald-500" />
                 <div className="p-5 flex flex-col gap-3">
                   {(candidate.education ?? []).map((ed, i) => (
                     <div key={i} className="flex flex-col gap-1.5 pb-3 last:pb-0 border-b last:border-b-0 border-gray-100">

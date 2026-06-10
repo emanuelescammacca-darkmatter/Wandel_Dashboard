@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import wandelLogo from '../../../assets/wandel-logo.png';
 import type { Candidate } from '../../../types';
 import { CARD_GRADIENT } from '../../../constants/theme';
+import { STAGES, useStages, setStage, stageOf, daysInStageOf, matchOf } from '../../../lib/talentStore';
 import CvDocument from './CvDocument';
 import {
   ageFromDob, formatDate, formatSalary, driversLicenseLabel, initials,
@@ -12,19 +13,10 @@ import {
 
 const WANDEL_INDIGO = 'brightness(0) saturate(100%) invert(57%) sepia(73%) saturate(1752%) hue-rotate(213deg) brightness(99%) contrast(96%)';
 
-/* Same categories as the Candidate Pipeline board on the Dashboard. */
-const EVAL_CATEGORIES: { key: string; label: string; accent: string }[] = [
-  { key: 'rejected', label: 'Rejected', accent: '#ef4444' },
-  { key: 'new', label: 'New', accent: '#3b82f6' },
-  { key: 'shortlist', label: 'Shortlisted', accent: '#6366f1' },
-  { key: 'interview', label: 'Interviewing', accent: '#a855f7' },
-  { key: 'offer', label: 'Offer Extended', accent: '#f59e0b' },
-  { key: 'hired', label: 'Hired', accent: '#16a34a' },
-];
+/* Evaluation categories = the canonical pipeline stages from the talent store —
+   the same enum the kanban boards and the position table use. */
+const EVAL_CATEGORIES = STAGES;
 
-/* Mock process meta — mirrors the Comparison scores until wired to real data. */
-const MATCH_BY_ID: Record<string, number> = { '1': 84, '2': 92, '3': 38, '4': 59, '5': 67, '6': 48, '7': 87, '8': 76 };
-const DAYS_IN_STAGE_BY_ID: Record<string, number> = { '1': 6, '2': 2, '3': 11, '4': 4, '5': 3, '6': 8, '7': 1, '8': 5 };
 const matchTone = (v: number) => (v >= 80 ? '#34d399' : v >= 60 ? '#fbbf24' : '#fb7185');
 
 /* Dark glass panel (top bar). */
@@ -70,9 +62,14 @@ export default function ProfileFactsRail({ candidate, onBack, backLabel }: { can
   const [saved, setSaved] = useState(false);
   const [flipped, setFlipped] = useState(false);
   const [evalOpen, setEvalOpen] = useState(false);
-  const [evalKey, setEvalKey] = useState<string>('new');
   const [cvOpen, setCvOpen] = useState(false);
   const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 1800); };
+
+  // Stage is read from (and written to) the shared talent store — the header tag,
+  // the kanban boards and the position table all stay in sync automatically.
+  const stages = useStages();
+  const evalKey = stageOf(stages, candidate.id);
+  const daysInStage = daysInStageOf(stages, candidate.id);
 
   const evalRef = useRef<HTMLDivElement>(null);
   const activeEval = EVAL_CATEGORIES.find(c => c.key === evalKey) ?? EVAL_CATEGORIES[1];
@@ -140,10 +137,10 @@ export default function ProfileFactsRail({ candidate, onBack, backLabel }: { can
               >
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: activeEval.accent, boxShadow: `0 0 8px ${activeEval.accent}` }} />
                 {activeEval.label}
-                <span className="text-slate-400 font-normal">· {DAYS_IN_STAGE_BY_ID[candidate.id] ?? 3}d</span>
+                <span className="text-slate-400 font-normal">· {daysInStage}d</span>
               </span>
               {(() => {
-                const score = MATCH_BY_ID[candidate.id] ?? 72;
+                const score = matchOf(candidate.id);
                 const tone = matchTone(score);
                 return (
                   <span
@@ -156,9 +153,9 @@ export default function ProfileFactsRail({ candidate, onBack, backLabel }: { can
                 );
               })()}
               {candidate.lastContactAt && (
-                <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400 pl-1" title="Letzter Kontakt">
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400 pl-1" title="Last contact">
                   <svg className="w-3.5 h-3.5 text-indigo-300/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 6l1.8 4.2L18 12l-4.2 1.8L12 18l-1.8-4.2L6 12l4.2-1.8L12 6z" /></svg>
-                  Sophia-Call · {formatDate(candidate.lastContactAt)}
+                  Sophia call · {formatDate(candidate.lastContactAt)}
                 </span>
               )}
             </div>
@@ -182,7 +179,7 @@ export default function ProfileFactsRail({ candidate, onBack, backLabel }: { can
                       return (
                         <button
                           key={cat.key}
-                          onClick={() => { setEvalKey(cat.key); setEvalOpen(false); }}
+                          onClick={() => { setStage(candidate.id, cat.key); setEvalOpen(false); }}
                           className="w-full flex items-center gap-2.5 text-[13px] px-2.5 py-2 rounded-lg transition-colors hover:bg-white/[0.06]"
                           style={active ? { background: `${cat.accent}1f` } : undefined}
                         >

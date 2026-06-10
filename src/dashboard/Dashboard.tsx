@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CARD_GRADIENT } from '../constants/theme';
 import wandelLogo from '../assets/wandel-logo.png';
+import { TALENT, STAGES, isTerminal, useStages, setStage, type Stage } from '../lib/talentStore';
 
 /* ──────────────────────────────────────────────────────────────────────────
    Client-facing recruiting dashboard — Design v4.
@@ -98,8 +99,21 @@ const PULSE_BY_TITLE: Record<string, PulseData> = {
 type FocusStage = { label: string; value: number; delta: string }; // resolved for a week
 // Per-stage value history across the last weeks (oldest → newest, newest = current week).
 type FocusFunnelStage = { label: string; history: number[] };
-type FocusTag = { kind: 'interview' | 'ready' | 'screening' | 'new'; text: string };
-type FocusCand = { id: string; name: string; tag: FocusTag; location: string; date: string; salary: string; score: number; color: string };
+type FocusTag = { kind: 'interview' | 'ready' | 'screening' | 'new' | 'rejected'; text: string };
+/* Highlight rows reference candidates by id — name, city, score, color and the
+   stage tag are resolved live from the talent store so they stay in sync with
+   the kanban board and the profile. */
+type FocusCand = { id: string; date: string; salary: string };
+
+/* Pipeline stage → highlight tag (kind drives the badge color). */
+const STAGE_TAG: Record<Stage, FocusTag> = {
+  rejected: { kind: 'rejected', text: 'Rejected' },
+  new: { kind: 'new', text: 'New match' },
+  shortlist: { kind: 'screening', text: 'Shortlisted' },
+  interview: { kind: 'interview', text: 'Interview scheduled' },
+  offer: { kind: 'ready', text: 'Offer extended' },
+  hired: { kind: 'ready', text: 'Hired' },
+};
 type FocusData = {
   total: number; qualified: number; status: string;
   funnel: [FocusFunnelStage, FocusFunnelStage, FocusFunnelStage];
@@ -117,13 +131,13 @@ const FOCUS_BY_TITLE: Record<string, FocusData> = {
       { label: 'Matched', history: [1, 1, 2, 2, 3] },
     ],
     initialCount: 3,
-    // 3 matched (top of the list) + 2 in screening — tags reflect the stage.
+    // Highlights = this position's candidates, best match first (resolved from the store).
     candidates: [
-      { id: '1', name: 'Markus Köhler', tag: { kind: 'interview', text: 'Interview Mo 10:00' }, location: 'Hofheim', date: '15.05.', salary: '€ 3.400', score: 92, color: '#16a34a' },
-      { id: '2', name: 'Andreas Klein', tag: { kind: 'interview', text: 'Interview Di 14:30' }, location: 'Wiesbaden', date: '01.06.', salary: '€ 3.300', score: 87, color: '#7c3aed' },
-      { id: '3', name: 'Sven Richter', tag: { kind: 'ready', text: 'Matched' }, location: 'Mainz', date: '15.05.', salary: '€ 3.500', score: 84, color: '#0891b2' },
-      { id: '4', name: 'Daniel Schmidt', tag: { kind: 'screening', text: 'In screening' }, location: 'Darmstadt', date: '01.07.', salary: '€ 3.600', score: 79, color: '#4f46e5' },
-      { id: '5', name: 'Thomas Bauer', tag: { kind: 'screening', text: 'In screening' }, location: 'Rüsselsheim', date: '15.05.', salary: '€ 3.200', score: 76, color: '#dc2626' },
+      { id: '2', date: 'Jul 1', salary: '€ 3.400' },
+      { id: '1', date: 'Aug 1', salary: '€ 3.650' },
+      { id: '5', date: 'now', salary: '€ 3.100' },
+      { id: '4', date: 'Sep 1', salary: '€ 3.800' },
+      { id: '6', date: 'now', salary: '€ 3.000' },
     ],
   },
   'Lagerlogistiker': {
@@ -135,10 +149,7 @@ const FOCUS_BY_TITLE: Record<string, FocusData> = {
     ],
     initialCount: 3,
     candidates: [
-      { id: '7', name: 'Klaus Müller', tag: { kind: 'interview', text: 'Interview Mi 09:00' }, location: 'Hamburg', date: '20.05.', salary: '€ 3.600', score: 91, color: '#0891b2' },
-      { id: '5', name: 'Thomas Bauer', tag: { kind: 'ready', text: 'Matched' }, location: 'Rüsselsheim', date: '01.06.', salary: '€ 3.200', score: 78, color: '#0369a1' },
-      { id: '4', name: 'Stefan Vogel', tag: { kind: 'ready', text: 'Matched' }, location: 'Frankfurt', date: '15.06.', salary: '€ 3.100', score: 74, color: '#4f46e5' },
-      { id: '6', name: 'Mehmet Yıldız', tag: { kind: 'screening', text: 'In screening' }, location: 'Offenbach', date: '01.07.', salary: '€ 3.000', score: 70, color: '#7c3aed' },
+      { id: '7', date: 'Jul 15', salary: '€ 2.400' },
     ],
   },
   'Bürokauffrau': {
@@ -150,9 +161,7 @@ const FOCUS_BY_TITLE: Record<string, FocusData> = {
     ],
     initialCount: 3,
     candidates: [
-      { id: '8', name: 'Sarah Klein', tag: { kind: 'interview', text: 'Interview Do 11:00' }, location: 'Wiesbaden', date: '18.05.', salary: '€ 2.900', score: 81, color: '#7c3aed' },
-      { id: '3', name: 'Elena Hoffmann', tag: { kind: 'ready', text: 'Matched' }, location: 'Frankfurt', date: '01.07.', salary: '€ 2.800', score: 76, color: '#be185d' },
-      { id: '6', name: 'Lisa Wagner', tag: { kind: 'screening', text: 'In screening' }, location: 'Mainz', date: '15.07.', salary: '€ 2.950', score: 72, color: '#4f46e5' },
+      { id: '8', date: 'Jun 1', salary: '€ 2.200' },
     ],
   },
 };
@@ -187,91 +196,64 @@ export type Cand = {
   criteria: MatchCriterion[];
 };
 
-const CANDIDATES: Cand[] = [
-  {
-    id: '2', name: 'Andi Kufner', position: 'Servicetechniker für Kaffeeautomaten',
-    location: 'Hofheim', distance: '23 km', fitPct: 87, available: 'May 2026', color: '#4f46e5',
-    criteria: [
-      { label: 'DGUV V3 certified', status: 'yes' },
-      { label: 'Field service experience', value: '8 yrs', status: 'yes' },
-      { label: 'Within commute', value: '23 km', status: 'yes' },
-      { label: 'Salary above range', value: '+200 €', status: 'partial' },
-    ],
-  },
-  {
-    id: '7', name: 'Klaus Müller', position: 'Lagerlogistiker',
-    location: 'Hamburg', distance: '8 km', fitPct: 91, available: 'now', color: '#0891b2',
-    criteria: [
-      { label: 'Forklift certified', status: 'yes' },
-      { label: 'Warehouse coordinator role', value: '12 yrs', status: 'yes' },
-      { label: 'Salary within range', value: '3.600 €', status: 'yes' },
-      { label: 'Shift flexibility', status: 'yes' },
-    ],
-  },
-  {
-    id: '1', name: 'Lukas Schneider', position: 'Servicetechniker für Kaffeeautomaten',
-    location: 'Frankfurt', distance: '31 km', fitPct: 79, available: 'June 2026', color: '#16a34a',
-    criteria: [
-      { label: 'DGUV V3 certified', status: 'yes' },
-      { label: 'Field service experience', value: '5 yrs', status: 'yes' },
-      { label: 'Within commute', value: '31 km', status: 'partial' },
-      { label: 'Salary within range', value: '3.200 €', status: 'yes' },
-    ],
-  },
-  {
-    id: '4', name: 'Mateusz Nowak', position: 'Servicetechniker für Kaffeeautomaten',
-    location: 'Offenbach', distance: '18 km', fitPct: 76, available: 'June 2026', color: '#d97706',
-    criteria: [
-      { label: 'Electrical background', value: '6 yrs', status: 'yes' },
-      { label: 'DGUV V3 certification', value: 'in progress', status: 'partial' },
-      { label: 'Within commute', value: '18 km', status: 'yes' },
-      { label: 'Salary within range', value: '3.300 €', status: 'yes' },
-    ],
-  },
-];
-
-const CANDIDATES_MORE: Cand[] = [
-  {
-    id: '8', name: 'Sarah Klein', position: 'Bürokauffrau',
-    location: 'Wiesbaden', distance: '12 km', fitPct: 74, available: 'Jul 2026', color: '#7c3aed',
-    criteria: [
-      { label: 'Commercial training', status: 'yes' },
-      { label: 'MS-Office proficient', status: 'yes' },
-      { label: 'German C1', status: 'yes' },
-      { label: 'Experience', value: '4 yrs', status: 'partial' },
-    ],
-  },
-  {
-    id: '5', name: 'Thomas Bauer', position: 'Lagerlogistiker',
-    location: 'Rüsselsheim', distance: '9 km', fitPct: 71, available: 'Jun 2026', color: '#0369a1',
-    criteria: [
-      { label: 'Forklift certified', status: 'yes' },
-      { label: 'Logistics experience', value: '7 yrs', status: 'yes' },
-      { label: 'Within commute', value: '9 km', status: 'yes' },
-      { label: 'Shift flexibility', status: 'partial' },
-    ],
-  },
-  {
-    id: '3', name: 'Elena Hoffmann', position: 'Bürokauffrau',
-    location: 'Frankfurt', distance: '6 km', fitPct: 68, available: 'Aug 2026', color: '#be185d',
-    criteria: [
-      { label: 'Commercial training', status: 'yes' },
-      { label: 'English & German fluent', status: 'yes' },
-      { label: 'MS-Office proficient', status: 'partial' },
-      { label: 'Experience', value: '3 yrs', status: 'partial' },
-    ],
-  },
-  {
-    id: '6', name: 'Jürgen Stein', position: 'Servicetechniker für Kaffeeautomaten',
-    location: 'Darmstadt', distance: '27 km', fitPct: 65, available: 'Jul 2026', color: '#b45309',
-    criteria: [
-      { label: 'Field service experience', value: '9 yrs', status: 'yes' },
-      { label: 'DGUV V3 certified', status: 'yes' },
-      { label: 'Within commute', value: '27 km', status: 'partial' },
-      { label: 'Salary above range', value: '+150 €', status: 'partial' },
-    ],
-  },
-];
+/* Per-candidate card data that is NOT in the talent store: match-reasoning
+   criteria (LLM output in production) and the earliest-start label. Identity,
+   location, match score and stage all come from the canonical store, so every
+   page shows the same person with the same values. */
+const CRITERIA_BY_ID: Record<string, MatchCriterion[]> = {
+  '1': [
+    { label: 'DGUV V3 certified', status: 'yes' },
+    { label: 'Field service experience', value: '7 yrs', status: 'yes' },
+    { label: 'Within commute', value: '8 km', status: 'yes' },
+    { label: 'Salary above budget', value: '+150 €', status: 'partial' },
+  ],
+  '2': [
+    { label: 'DGUV V3 certified', status: 'yes' },
+    { label: 'Field service experience', value: '9 yrs', status: 'yes' },
+    { label: 'Within commute', value: '12 km', status: 'yes' },
+    { label: 'Salary within budget', value: '3.400 €', status: 'yes' },
+  ],
+  '3': [
+    { label: 'Technical training', status: 'yes' },
+    { label: 'Field service experience', value: 'none', status: 'partial' },
+    { label: 'Within commute', value: '62 km', status: 'partial' },
+    { label: 'Salary above budget', value: '+700 €', status: 'partial' },
+  ],
+  '4': [
+    { label: 'Mechanical background', value: '4 yrs', status: 'yes' },
+    { label: 'DGUV V3 certification', value: 'missing', status: 'partial' },
+    { label: 'Within commute', value: '55 km', status: 'partial' },
+    { label: 'Salary above budget', value: '+300 €', status: 'partial' },
+  ],
+  '5': [
+    { label: 'Customer-facing service', value: '7 yrs', status: 'yes' },
+    { label: 'German level', value: 'B1', status: 'partial' },
+    { label: 'Within commute', value: '10 km', status: 'yes' },
+    { label: 'Salary within budget', value: '3.100 €', status: 'yes' },
+  ],
+  '6': [
+    { label: 'High motivation', status: 'yes' },
+    { label: 'Technical training', value: 'missing', status: 'partial' },
+    { label: 'Within commute', value: '15 km', status: 'yes' },
+    { label: 'No own car', status: 'partial' },
+  ],
+  '7': [
+    { label: 'Forklift certified', status: 'yes' },
+    { label: 'Warehouse experience', value: '12 yrs', status: 'yes' },
+    { label: 'Salary within budget', value: '2.400 €', status: 'yes' },
+    { label: 'Shift flexibility', status: 'partial' },
+  ],
+  '8': [
+    { label: 'Commercial training', status: 'yes' },
+    { label: 'MS-Office proficient', status: 'yes' },
+    { label: 'German native', status: 'yes' },
+    { label: 'Experience', value: '6 yrs', status: 'yes' },
+  ],
+};
+const AVAILABLE_BY_ID: Record<string, string> = {
+  '1': 'Aug 2026', '2': 'Jul 2026', '3': 'Oct 2026', '4': 'Sep 2026',
+  '5': 'now', '6': 'now', '7': 'Jul 2026', '8': 'Jun 2026',
+};
 
 const initials = (n: string) => n.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
@@ -514,7 +496,15 @@ export function CandidateCard({ c, selectable = false, selected = false, onToggl
 }
 
 /* All candidates (top + extra), used to match a position to its candidates. */
-export const ALL_CANDIDATES = [...CANDIDATES, ...CANDIDATES_MORE];
+/* All candidate cards, built from the canonical talent store (sorted by fit). */
+export const ALL_CANDIDATES: Cand[] = Object.values(TALENT)
+  .map(t => ({
+    id: t.id, name: t.name, position: t.position,
+    location: t.city, distance: t.distance,
+    fitPct: t.match, available: AVAILABLE_BY_ID[t.id] ?? 'now', color: t.color,
+    criteria: CRITERIA_BY_ID[t.id] ?? [],
+  }))
+  .sort((a, b) => b.fitPct - a.fitPct);
 
 /* ── Inner position content (no card chrome) — reused by the collapsed card
    and as the left column of the expanded full-width card. ── */
@@ -724,47 +714,41 @@ const DROPOFF_BY: Record<StatKey, DropOffData> = {
   },
 };
 
-/* Candidate locations on a real geo map. Shared city coordinates; per-position
-   counts pick a subset. 'all' is the full pipeline. */
+/* Candidate locations on a real geo map — derived from the canonical talent
+   store (greater Munich area, matching the candidates' profile cities). */
 const CITY_COORDS: Record<string, [number, number]> = {
-  Frankfurt: [50.1109, 8.6821],
-  Wiesbaden: [50.0782, 8.2398],
-  Mainz: [49.9929, 8.2473],
-  Darmstadt: [49.8728, 8.6512],
-  Hofheim: [50.0876, 8.4490],
-  Rüsselsheim: [49.9926, 8.4090],
-  Offenbach: [50.0955, 8.7761],
-  Hanau: [50.1273, 8.9183],
+  'München': [48.1351, 11.5820],
+  'Dachau': [48.2599, 11.4342],
+  'Freising': [48.4028, 11.7489],
+  'Augsburg': [48.3705, 10.8978],
+  'Rosenheim': [47.8561, 12.1289],
 };
 /* Candidate names per city — shown when hovering a map point (sliced to count).
    Each links to its profile via /clients/positions/candidate/:id. */
-const CITY_CANDIDATES: Record<string, { name: string; id: string }[]> = {
-  Frankfurt: [{ name: 'Markus Köhler', id: '1' }, { name: 'Lena Vogt', id: '2' }, { name: 'Daniel Schmidt', id: '4' }, { name: 'Aylin Kaya', id: '6' }, { name: 'Tobias Brandt', id: '3' }, { name: 'Sofia Russo', id: '5' }],
-  Wiesbaden: [{ name: 'Andreas Klein', id: '2' }, { name: 'Petra Lang', id: '7' }, { name: 'Jan Hofmann', id: '3' }, { name: 'Mara Sommer', id: '8' }],
-  Mainz: [{ name: 'Sven Richter', id: '3' }, { name: 'Nina Weber', id: '5' }, { name: 'Paul Adler', id: '1' }, { name: 'Kira Berg', id: '6' }],
-  Darmstadt: [{ name: 'Daniel Schmidt', id: '4' }, { name: 'Hannah Roth', id: '7' }, { name: 'Felix Wolf', id: '2' }],
-  Hofheim: [{ name: 'Markus Köhler', id: '1' }, { name: 'Jonas Pfeiffer', id: '6' }],
-  Rüsselsheim: [{ name: 'Thomas Bauer', id: '5' }, { name: 'Ina Krüger', id: '8' }],
-  Offenbach: [{ name: 'Erik Naumann', id: '4' }, { name: 'Cem Yıldız', id: '7' }],
-  Hanau: [{ name: 'Greta Sommer', id: '8' }],
+const CITY_CANDIDATES: Record<string, { name: string; id: string }[]> = Object.values(TALENT).reduce(
+  (acc, t) => {
+    (acc[t.city] ??= []).push({ name: t.name, id: t.id });
+    return acc;
+  },
+  {} as Record<string, { name: string; id: string }[]>,
+);
+const POSITION_BY_STAT: Record<Exclude<StatKey, 'all'>, string> = {
+  service: 'Servicetechniker für Kaffeeautomaten',
+  lager: 'Lagerlogistiker',
+  buero: 'Bürokauffrau',
+};
+/* City counts per position filter, computed from the same canonical data. */
+const locationCounts = (key: StatKey): { city: string; count: number }[] => {
+  const pool = Object.values(TALENT).filter(t => key === 'all' || t.position === POSITION_BY_STAT[key]);
+  const byCity = new Map<string, number>();
+  pool.forEach(t => byCity.set(t.city, (byCity.get(t.city) ?? 0) + 1));
+  return [...byCity.entries()].map(([city, count]) => ({ city, count })).sort((a, b) => b.count - a.count);
 };
 const CANDIDATE_LOCATIONS_BY: Record<StatKey, { city: string; count: number }[]> = {
-  all: [
-    { city: 'Frankfurt', count: 6 }, { city: 'Wiesbaden', count: 4 }, { city: 'Mainz', count: 4 },
-    { city: 'Darmstadt', count: 3 }, { city: 'Hofheim', count: 2 }, { city: 'Rüsselsheim', count: 2 },
-    { city: 'Offenbach', count: 2 }, { city: 'Hanau', count: 1 },
-  ],
-  service: [
-    { city: 'Frankfurt', count: 4 }, { city: 'Darmstadt', count: 3 }, { city: 'Wiesbaden', count: 2 },
-    { city: 'Hanau', count: 1 }, { city: 'Offenbach', count: 1 },
-  ],
-  lager: [
-    { city: 'Frankfurt', count: 2 }, { city: 'Rüsselsheim', count: 2 }, { city: 'Mainz', count: 2 },
-    { city: 'Wiesbaden', count: 1 }, { city: 'Hofheim', count: 1 },
-  ],
-  buero: [
-    { city: 'Frankfurt', count: 3 }, { city: 'Wiesbaden', count: 2 }, { city: 'Mainz', count: 1 }, { city: 'Offenbach', count: 1 },
-  ],
+  all: locationCounts('all'),
+  service: locationCounts('service'),
+  lager: locationCounts('lager'),
+  buero: locationCounts('buero'),
 };
 
 /* Resolve a filtered locations list into map-ready points (with coords + total). */
@@ -1327,33 +1311,40 @@ const FOCUS_TAG_CLS: Record<FocusTag['kind'], string> = {
   ready: 'text-[#15803d] bg-[#f0fdf4] border-[#bbf7d0]',
   screening: 'text-[#b45309] bg-[#fffbeb] border-[#fde68a]',
   new: 'text-[#0369a1] bg-[#f0f9ff] border-[#bae6fd]',
+  rejected: 'text-[#b91c1c] bg-[#fef2f2] border-[#fecaca]',
 };
 
 function FocusCandidateRow({ c, delay }: { c: FocusCand; delay: number }) {
   const navigate = useNavigate();
+  const stages = useStages();
+  const t = TALENT[c.id];
+  if (!t) return null;
+  // The tag follows the live pipeline stage — drag the card on the kanban board
+  // (or change it on the profile) and this badge updates instantly.
+  const tag = STAGE_TAG[stages[c.id]?.stage ?? 'new'];
   return (
     <div
       onClick={(e) => { e.stopPropagation(); navigate(`/clients/positions/candidate/${c.id}`); }}
       className="flex items-center gap-3 animate-panel-in rounded-xl border border-transparent px-2.5 py-2 -mx-2.5 cursor-pointer transition-all duration-150 hover:border-[#818cf8] hover:bg-[#f5f6ff] hover:shadow-[0_2px_10px_rgba(99,102,241,0.12)]"
       style={{ animationDelay: `${delay * 50}ms` }}
     >
-      <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-[12px] font-semibold shrink-0" style={{ background: c.color }}>
-        {initials(c.name)}
+      <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-[12px] font-semibold shrink-0" style={{ background: t.color }}>
+        {initials(t.name)}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[14px] font-semibold text-[#0f172a] leading-tight">{c.name}</span>
-          <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border ${FOCUS_TAG_CLS[c.tag.kind]}`}>{c.tag.text}</span>
+          <span className="text-[14px] font-semibold text-[#0f172a] leading-tight">{t.name}</span>
+          <span className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border ${FOCUS_TAG_CLS[tag.kind]}`}>{tag.text}</span>
         </div>
         <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-[#64748b]">
-          <span className="inline-flex items-center gap-1 text-[#94a3b8]"><PinIcon />{c.location}</span>
+          <span className="inline-flex items-center gap-1 text-[#94a3b8]"><PinIcon />{t.city}</span>
           <span className="text-[#cbd5e1]">·</span>
           <span className="inline-flex items-center gap-1 text-[#94a3b8]"><CalIcon />{c.date}</span>
           <span className="text-[#cbd5e1]">·</span>
           <span>{c.salary}</span>
         </div>
       </div>
-      <ScoreRing score={c.score} />
+      <ScoreRing score={t.match} />
     </div>
   );
 }
@@ -1418,7 +1409,7 @@ function PositionFocusCard({ p, d, onSelect, phase = 0, fullWidth = false }: { p
       </div>
 
       <div className="flex flex-col gap-2">
-        {shown.map((c, i) => <FocusCandidateRow key={c.name} c={c} delay={i} />)}
+        {shown.map((c, i) => <FocusCandidateRow key={c.id} c={c} delay={i} />)}
       </div>
 
       {moreCount > 0 && (
@@ -1552,7 +1543,7 @@ function LocationsCard({ pts, total }: { pts: { city: string; count: number; lat
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[14px] font-semibold text-white">Candidate Locations</p>
-          <p className="text-[12px] text-[#94a3b8] mt-0.5">Rhein-Main region · {total} candidates</p>
+          <p className="text-[12px] text-[#94a3b8] mt-0.5">Greater Munich area · {total} candidates</p>
         </div>
         <span className="text-[11px] text-[#64748b]">{pts.length} cities</span>
       </div>
@@ -1560,8 +1551,8 @@ function LocationsCard({ pts, total }: { pts: { city: string; count: number; lat
       {/* interactive Leaflet map (CARTO Voyager — real, lighter geo map) */}
       <div className="relative mt-4 flex-1 rounded-lg overflow-hidden border border-white/5" style={{ minHeight: 300 }}>
         <MapContainer
-          center={[50.0, 8.5]}
-          zoom={10}
+          center={[48.18, 11.45]}
+          zoom={9}
           scrollWheelZoom={false}
           zoomControl
           attributionControl={false}
@@ -1614,42 +1605,32 @@ function LocationsCard({ pts, total }: { pts: { city: string; count: number; lat
    An interactive drag-and-drop board for hands-on candidate management. Cards
    move between stages; each column shows its WIP count and flags candidates
    that have stalled. Replaces the static "Top Candidates" strip. */
-type KStage = 'rejected' | 'new' | 'shortlist' | 'interview' | 'offer' | 'hired';
-const KSTAGES: { key: KStage; label: string; hint: string; accent: string; terminal?: boolean }[] = [
-  { key: 'rejected', label: 'Rejected', hint: 'Not moving forward', accent: '#ef4444', terminal: true },
-  { key: 'new', label: 'New', hint: 'Fresh matches', accent: '#3b82f6' },
-  { key: 'shortlist', label: 'Shortlisted', hint: 'Marked for review', accent: '#6366f1' },
-  { key: 'interview', label: 'Interviewing', hint: 'Scheduled or pending', accent: '#a855f7' },
-  { key: 'offer', label: 'Offer Extended', hint: 'Awaiting decision', accent: '#f59e0b' },
-  { key: 'hired', label: 'Hired', hint: 'Closed — won', accent: '#16a34a', terminal: true },
-];
+/* Stage definitions come from the canonical talent store — the same enum the
+   position table and the profile evaluate-dropdown use. */
+const KSTAGES = STAGES;
 const STALL_DAYS = 5; // candidates idle this long in an active stage get nudged
 
-type BoardCand = Cand & { stage: KStage; daysInStage: number };
-const INITIAL_BOARD: BoardCand[] = [
-  { ...ALL_CANDIDATES.find(c => c.id === '6')!, stage: 'rejected', daysInStage: 3 },
-  { ...ALL_CANDIDATES.find(c => c.id === '5')!, stage: 'new', daysInStage: 2 },
-  { ...ALL_CANDIDATES.find(c => c.id === '3')!, stage: 'new', daysInStage: 4 },
-  { ...ALL_CANDIDATES.find(c => c.id === '4')!, stage: 'shortlist', daysInStage: 6 },
-  { ...ALL_CANDIDATES.find(c => c.id === '1')!, stage: 'interview', daysInStage: 2 },
-  { ...ALL_CANDIDATES.find(c => c.id === '8')!, stage: 'interview', daysInStage: 7 },
-  { ...ALL_CANDIDATES.find(c => c.id === '2')!, stage: 'offer', daysInStage: 1 },
-  { ...ALL_CANDIDATES.find(c => c.id === '7')!, stage: 'hired', daysInStage: 1 },
-];
+type BoardCand = Cand & { stage: Stage; daysInStage: number };
 
-const isStageTerminal = (s: KStage) => KSTAGES.find(k => k.key === s)?.terminal ?? false;
-const isStalled = (c: BoardCand) => !isStageTerminal(c.stage) && c.daysInStage >= STALL_DAYS;
+const isStalled = (c: BoardCand) => !isTerminal(c.stage) && c.daysInStage >= STALL_DAYS;
 
 export function PipelineBoard({ positions, hideFilter = false, restrictPosition }: { positions: string[]; hideFilter?: boolean; restrictPosition?: string }) {
-  const [cards, setCards] = useState<BoardCand[]>(INITIAL_BOARD);
+  const stageState = useStages();
   const [posFilter, setPosFilter] = useState<string>('all');
   const [dragId, setDragId] = useState<string | null>(null);
-  const [overStage, setOverStage] = useState<KStage | null>(null);
+  const [overStage, setOverStage] = useState<Stage | null>(null);
+
+  // Cards = canonical candidates joined with the live stage state.
+  const cards: BoardCand[] = ALL_CANDIDATES.map(c => ({
+    ...c,
+    stage: stageState[c.id]?.stage ?? 'new',
+    daysInStage: stageState[c.id]?.daysInStage ?? 0,
+  }));
 
   const scoped = restrictPosition ? cards.filter(c => c.position === restrictPosition) : cards;
   const visible = posFilter === 'all' ? scoped : scoped.filter(c => c.position === posFilter);
-  const move = (id: string, stage: KStage) =>
-    setCards(cs => cs.map(c => (c.id === id && c.stage !== stage ? { ...c, stage, daysInStage: 0 } : c)));
+  // Writes go to the shared store — every other surface updates immediately.
+  const move = (id: string, stage: Stage) => setStage(id, stage);
 
   const stalledCount = visible.filter(isStalled).length;
   const filters = [{ key: 'all', label: 'All positions' }, ...positions.map(p => ({ key: p, label: p }))];

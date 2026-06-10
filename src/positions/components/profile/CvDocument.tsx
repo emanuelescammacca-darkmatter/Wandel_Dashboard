@@ -97,9 +97,9 @@ export default function CvDocument({ candidate, onClose }: { candidate: Candidat
 
   const heroChips: { icon: string; text: string }[] = [
     candidate.city ? { icon: ICON.pin, text: candidate.city } : null,
-    age ? { icon: ICON.cake, text: `${age} Jahre` } : null,
+    age ? { icon: ICON.cake, text: `${age} years` } : null,
     candidate.nationality ? { icon: ICON.globe, text: candidate.nationality } : null,
-    candidate.driversLicense ? { icon: ICON.car, text: `Führerschein ${candidate.licenseClasses ?? ''}`.trim() } : null,
+    candidate.driversLicense ? { icon: ICON.car, text: `Licence ${candidate.licenseClasses ?? ''}`.trim() } : null,
   ].filter(Boolean) as { icon: string; text: string }[];
 
   return (

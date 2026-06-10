@@ -70,28 +70,28 @@ export default function ProfileThreeColumn({ candidate, onBack, backLabel }: { c
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <ColTitle icon={Icons.briefcase}>Allgemeine Angaben</ColTitle>
             <div className="p-4 flex flex-col gap-3.5">
-              <MiniFact icon={Icons.phone} label="Telefon" value={candidate.phoneNumber} />
+              <MiniFact icon={Icons.phone} label="Phone" value={candidate.phoneNumber} />
               <MiniFact icon={Icons.mail} label="E-Mail" value={candidate.email} />
               <MiniFact
                 icon={Icons.cake}
-                label="Geburtstag"
+                label="Birthday"
                 value={candidate.dateOfBirth ? `${formatDate(candidate.dateOfBirth)}${age ? ` · ${age} J.` : ''}` : null}
               />
-              <MiniFact icon={Icons.pin} label="Adresse" value={candidate.address} />
-              <MiniFact icon={Icons.globe} label="Nationalität" value={candidate.nationality} />
+              <MiniFact icon={Icons.pin} label="Address" value={candidate.address} />
+              <MiniFact icon={Icons.globe} label="Nationality" value={candidate.nationality} />
               <div className="border-t border-gray-100 pt-3.5 grid grid-cols-2 gap-3.5">
                 <MiniFact
                   icon={Icons.language}
-                  label="Deutsch"
+                  label="German level"
                   value={candidate.germanLevel ? (
                     <span className="inline-block text-[11px] px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-medium">
                       {candidate.germanLevel}
                     </span>
                   ) : null}
                 />
-                <MiniFact icon={Icons.car} label="Führerschein" value={driversLicenseLabel(candidate.driversLicense, candidate.licenseClasses)} />
-                <MiniFact icon={Icons.clock} label="Kündigungsfrist" value={candidate.noticePeriod} />
-                <MiniFact icon={Icons.euro} label="Gehaltswunsch" value={formatSalary(candidate.salary)} />
+                <MiniFact icon={Icons.car} label="Driver's licence" value={driversLicenseLabel(candidate.driversLicense, candidate.licenseClasses)} />
+                <MiniFact icon={Icons.clock} label="Notice period" value={candidate.noticePeriod} />
+                <MiniFact icon={Icons.euro} label="Salary expectation" value={formatSalary(candidate.salary)} />
               </div>
             </div>
           </div>
@@ -118,7 +118,7 @@ export default function ProfileThreeColumn({ candidate, onBack, backLabel }: { c
             </div>
 
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <ColTitle icon={Icons.cap}>Ausbildung & Studium</ColTitle>
+              <ColTitle icon={Icons.cap}>Education & Training</ColTitle>
               <div className="p-4 flex flex-col gap-3">
                 {(candidate.education ?? []).map((ed, i) => (
                   <div key={i} className="flex flex-col gap-1 pb-3 last:pb-0 border-b last:border-b-0 border-gray-100">
@@ -144,7 +144,7 @@ export default function ProfileThreeColumn({ candidate, onBack, backLabel }: { c
                   <svg className="w-3.5 h-3.5 text-amber-300" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4L12 17l-6.3 4.4L8 14 2 9.4h7.6L12 2z" />
                   </svg>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-white/70">Unsere Einschätzung</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-white/70">Our Assessment</p>
                 </div>
                 <p className="px-4 py-4 text-[13px] leading-relaxed text-white/90">{candidate.assessment}</p>
               </div>

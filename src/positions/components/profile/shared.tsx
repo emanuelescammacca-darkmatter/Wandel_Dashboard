@@ -11,31 +11,31 @@ export function ageFromDob(dob: string | null | undefined): number | null {
   return age;
 }
 
-/** Format an ISO date as German long date, e.g. "12. Juni 1990". */
+/** Format an ISO date as a long date, e.g. "June 12, 1990". */
 export function formatDate(iso: string | null | undefined): string | null {
   if (!iso) return null;
-  return new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
-/** Format a monthly gross salary string, e.g. "2900" -> "2.800 € / Monat". */
+/** Format a monthly gross salary string, e.g. "2900" -> "2.900 € / month". */
 export function formatSalary(salary: string | null | undefined): string | null {
   if (!salary) return null;
   const n = Number(salary);
   if (Number.isNaN(n)) return salary;
-  return `${n.toLocaleString('de-DE')} € / Monat`;
+  return `${n.toLocaleString('de-DE')} € / month`;
 }
 
 export function driversLicenseLabel(has: boolean | null | undefined, classes: string | null | undefined): string | null {
-  if (has === true) return classes ? `Ja — Klasse ${classes}` : 'Ja';
-  if (has === false) return 'Nein';
+  if (has === true) return classes ? `Yes — Class ${classes}` : 'Yes';
+  if (has === false) return 'No';
   return null;
 }
 
 export const EDUCATION_TYPE_LABEL: Record<EducationEntry['type'], string> = {
-  ausbildung: 'Ausbildung',
-  studium: 'Studium',
-  lehre: 'Lehre',
-  weiterbildung: 'Weiterbildung',
+  ausbildung: 'Vocational training',
+  studium: 'Degree',
+  lehre: 'Apprenticeship',
+  weiterbildung: 'Further training',
 };
 
 export const EDUCATION_TYPE_STYLE: Record<EducationEntry['type'], string> = {
