@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard, Position &amp; Candidate Logic — Developer Handover</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;1,400;1,600&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #fafaf7;
+    --bg-card: #ffffff;
+    --bg-subtle: #f4f3ee;
+    --ink: #1a1a1a;
+    --ink-soft: #4a4a47;
+    --ink-mute: #8a8a85;
+    --line: #e5e4dc;
+    --accent: #5b4dff;
+    --accent-soft: #ece9ff;
+    --tag-mock: #b8531a;        --tag-mock-bg: #fbeadb;     /* hard-coded mock in the repo */
+    --tag-db: #1e6b3a;          --tag-db-bg: #e3f3e8;       /* backend / database */
+    --tag-llm: #8a4a14;         --tag-llm-bg: #fce4cf;      /* LLM-generated */
+    --tag-rule: #2a5a6a;        --tag-rule-bg: #dceef3;     /* deterministic rule, computed */
+    --tag-manual: #7a5d1e;      --tag-manual-bg: #f4ecd3;   /* recruiter input in the UI */
+    --tag-sophia: #6b3aa3;      --tag-sophia-bg: #efe6f7;   /* from the Sophia screening call */
+    --prop-edit: #1f4ea3;       --prop-edit-bg: #e4ecf9;
+    --prop-hard: #5a3a1b;       --prop-hard-bg: #f1e8dc;
+    --warn: #b91c1c;            --warn-bg: #fdecec;
+    --ok: #166534;              --ok-bg: #e8f6ec;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter Tight', sans-serif;
+    background: var(--bg); color: var(--ink);
+    line-height: 1.55; padding: 56px 32px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrapper { max-width: 1020px; margin: 0 auto; }
+
+  header.doc { border-bottom: 1px solid var(--line); padding-bottom: 36px; margin-bottom: 48px; }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: 16px; }
+  h1 { font-family: 'Fraunces', serif; font-weight: 600; font-size: clamp(34px, 5vw, 50px); line-height: 1.07; letter-spacing: -0.02em; margin-bottom: 18px; }
+  h1 em { font-style: italic; color: var(--accent); }
+  .lede { font-size: 17px; color: var(--ink-soft); max-width: 68ch; }
+  .meta { display: flex; gap: 24px; margin-top: 24px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-mute); }
+  .meta span strong { color: var(--ink); font-weight: 500; margin-left: 6px; }
+
+  nav.toc { background: var(--bg-card); border: 1px solid var(--line); border-radius: 14px; padding: 24px 30px; margin-bottom: 48px; }
+  nav.toc p { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: 12px; }
+  nav.toc ol { list-style: none; columns: 2; column-gap: 40px; }
+  nav.toc li { margin-bottom: 7px; break-inside: avoid; }
+  nav.toc a { color: var(--ink); text-decoration: none; font-size: 14.5px; }
+  nav.toc a:hover { color: var(--accent); }
+  nav.toc a .no { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); margin-right: 10px; }
+
+  section.doc-sec { margin-bottom: 72px; }
+  .sec-head { display: flex; align-items: baseline; gap: 16px; border-bottom: 2px solid var(--ink); padding-bottom: 12px; margin-bottom: 28px; }
+  .sec-head .no { font-family: 'JetBrains Mono', monospace; font-size: 15px; color: var(--accent); }
+  h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 30px; letter-spacing: -0.015em; }
+  h3 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 20px; letter-spacing: -0.01em; margin: 34px 0 12px; }
+  h4 { font-size: 15px; font-weight: 700; margin: 26px 0 10px; }
+  p { font-size: 15px; color: var(--ink-soft); margin-bottom: 12px; max-width: 86ch; }
+  section.doc-sec > p:first-of-type { font-size: 16px; }
+  ul.plain { margin: 0 0 14px 20px; font-size: 14.5px; color: var(--ink-soft); }
+  ul.plain li { margin-bottom: 6px; }
+  code { font-family: 'JetBrains Mono', monospace; font-size: .86em; background: var(--bg-subtle); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; color: var(--ink); white-space: nowrap; }
+  pre { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.6; background: #14141f; color: #e6e6f0; border-radius: 10px; padding: 18px 22px; overflow-x: auto; margin: 14px 0 20px; }
+  pre code { background: none; border: none; padding: 0; color: inherit; white-space: pre; }
+
+  .card { background: var(--bg-card); border: 1px solid var(--line); border-radius: 14px; padding: 26px 30px; margin: 18px 0 24px; }
+  .callout { border-left: 4px solid var(--accent); background: var(--accent-soft); border-radius: 0 10px 10px 0; padding: 16px 20px; margin: 16px 0 20px; font-size: 14.5px; color: var(--ink-soft); max-width: none; }
+  .callout strong { color: var(--ink); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-bg); }
+  .callout.ok { border-left-color: var(--ok); background: var(--ok-bg); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 14px 0 24px; background: var(--bg-card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  table { display: block; overflow-x: auto; }
+  thead th { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; text-align: left; color: var(--ink-mute); background: var(--bg-subtle); padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  tbody td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink-soft); min-width: 110px; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.idx { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); white-space: nowrap; }
+  td strong { color: var(--ink); font-weight: 600; }
+
+  .tag { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .03em; padding: 2px 9px; border-radius: 99px; white-space: nowrap; font-weight: 500; }
+  .tag.mock   { color: var(--tag-mock);   background: var(--tag-mock-bg); }
+  .tag.db     { color: var(--tag-db);     background: var(--tag-db-bg); }
+  .tag.llm    { color: var(--tag-llm);    background: var(--tag-llm-bg); }
+  .tag.rule   { color: var(--tag-rule);   background: var(--tag-rule-bg); }
+  .tag.manual { color: var(--tag-manual); background: var(--tag-manual-bg); }
+  .tag.sophia { color: var(--tag-sophia); background: var(--tag-sophia-bg); }
+  .prop { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; padding: 2px 9px; border-radius: 99px; white-space: nowrap; }
+  .prop.edit { color: var(--prop-edit); background: var(--prop-edit-bg); }
+  .prop.hard { color: var(--prop-hard); background: var(--prop-hard-bg); }
+
+  .flow { background: #14141f; border-radius: 14px; padding: 28px 30px; margin: 18px 0 26px; color: #cfd2e6; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.75; overflow-x: auto; }
+  .flow b { color: #ffffff; font-weight: 600; }
+  .flow .hl { color: #9b8cff; }
+  .flow pre { background: none; padding: 0; margin: 0; }
+
+  .filemap { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; }
+  .filemap td { white-space: nowrap; }
+
+  .qa { border: 1px dashed var(--line); border-radius: 12px; padding: 18px 22px; margin: 18px 0; background: var(--bg-subtle); }
+  .qa p.t { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: 10px; }
+  .qa ul { margin-left: 18px; font-size: 14px; color: var(--ink-soft); }
+  .qa li { margin-bottom: 6px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 12px 0 8px; font-size: 13px; color: var(--ink-soft); align-items: center; }
+
+  figure.shot { margin: 20px 0 28px; }
+  figure.shot img { width: 100%; display: block; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 32px rgba(0,0,0,0.10); }
+  figure.shot.narrow img { max-width: 640px; margin: 0 auto; }
+  figure.shot figcaption { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--ink-mute); margin-top: 9px; }
+  .shot-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 760px) { .shot-pair { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<!-- ════════════════════════════ HEADER ════════════════════════════ -->
+<header class="doc">
+  <p class="eyebrow">Engineering Handover · v1.0 · Wandel Dashboard</p>
+  <h1>Dashboard, Position &amp; Candidate Logic<br /><em>UI → Backend Implementation Spec</em></h1>
+  <p class="lede">
+    The client-facing recruiting UI (Dashboard, Position Workspace, Candidate Profile) exists as a fully
+    working React prototype, currently powered by hard-coded mock data. This document specifies — screen by
+    screen, field by field — what the backend must provide, how data flows between the pages, which values
+    are deterministic rules vs. LLM outputs, the suggested database schema, and the LLM prompts needed to
+    replace every mock.
+  </p>
+  <div class="meta">
+    <span>Repo<strong>github.com/emanuelescammacca-darkmatter/Wandel_Dashboard</strong></span>
+    <span>Stack<strong>React 19 · TypeScript · Vite · Tailwind 4</strong></span>
+    <span>Scope<strong>3 feature areas · 11 sections + appendix</strong></span>
+    <span>Status<strong>Ready for implementation</strong></span>
+  </div>
+</header>
+
+<!-- ════════════════════════════ TOC ════════════════════════════ -->
+<nav class="toc">
+  <p>Contents</p>
+  <ol>
+    <li><a href="#about"><span class="no">00</span>About this document</a></li>
+    <li><a href="#architecture"><span class="no">01</span>Architecture &amp; data flow</a></li>
+    <li><a href="#routes"><span class="no">02</span>Routes &amp; information flow between pages</a></li>
+    <li><a href="#stages"><span class="no">03</span>The canonical stage model (single source of truth)</a></li>
+    <li><a href="#dashboard"><span class="no">04</span>Dashboard</a></li>
+    <li><a href="#position"><span class="no">05</span>Position Workspace</a></li>
+    <li><a href="#candidate"><span class="no">06</span>Candidate Profile</a></li>
+    <li><a href="#schema"><span class="no">07</span>Database schema (proposal)</a></li>
+    <li><a href="#llm"><span class="no">08</span>LLM tasks &amp; prompts</a></li>
+    <li><a href="#rules"><span class="no">09</span>Deterministic rules reference</a></li>
+    <li><a href="#missing"><span class="no">10</span>What is missing / open decisions</a></li>
+    <li><a href="#appendix"><span class="no">A</span>Appendix — enums, file map, mock inventory</a></li>
+  </ol>
+</nav>
+
+<!-- ════════════════════════════ 00 ABOUT ════════════════════════════ -->
+<section class="doc-sec" id="about">
+  <div class="sec-head"><span class="no">00</span><h2>About this document</h2></div>
+  <p>
+    The UI was built design-first: every screen is final in look, feel and interaction, but reads from
+    constants inside the React components. Your job is to replace those constants with real data without
+    changing the UI. For every block this document tells you:
+  </p>
+  <ul class="plain">
+    <li><strong>Where the value lives today</strong> — file + constant name, so you can find and delete the mock.</li>
+    <li><strong>Where it must come from</strong> — database field, computed rule, recruiter input, Sophia call, or LLM.</li>
+    <li><strong>The exact shape</strong> — the TypeScript type the component consumes is the API contract.</li>
+    <li><strong>The behavior</strong> — interactions and cross-page side-effects you must preserve.</li>
+  </ul>
+  <div class="legend">
+    <strong>Source tags used throughout:</strong>
+    <span class="tag mock">Mock</span> hard-coded today, must be replaced
+    <span class="tag db">Database</span> stored field
+    <span class="tag rule">Computed</span> deterministic backend rule
+    <span class="tag sophia">Sophia Call</span> structured output of the screening call
+    <span class="tag llm">LLM</span> generated by a model (prompt in §08)
+    <span class="tag manual">Manual</span> recruiter input in the UI
+  </div>
+  <div class="legend">
+    <strong>Property tags:</strong>
+    <span class="prop edit">Editable</span> user can change it in this view
+    <span class="prop hard">Read-only</span> display only
+  </div>
+  <div class="callout">
+    <strong>Ground rule:</strong> everything shown in the UI must be <em>standardizable</em> — either a stored
+    field, a deterministic rule over stored fields, or a clearly-labeled LLM output produced by a fixed prompt
+    per call/candidate. No free-form, manually-maintained display strings.
+  </div>
+  <div class="callout warn">
+    <strong>Out of scope:</strong> the internal recruiter area (sidebar “Candidates” → candidate detail,
+    “Positions”, “Clients”) is <em>not</em> part of this handover — do not refactor or translate it as part of
+    this work. This document covers exactly three client-facing areas: Dashboard, Position Workspace,
+    Candidate Profile.
+  </div>
+
+  <h3>Start here — five things to internalize before reading on</h3>
+  <div class="card">
+    <ol style="margin-left:20px; font-size:15px; color:var(--ink-soft); display:flex; flex-direction:column; gap:10px;">
+      <li><strong>Everything you see is mock.</strong> The UI is finished; not a single value comes from a server. Appendix A.3 lists every mock constant and the file it lives in.</li>
+      <li><strong>The central record is the <code>application</code></strong> (candidate × position) — <em>not</em> the candidate. Stage, match score, criteria, notes and assessment all belong to an application. One person applying to two positions = two applications with independent stages. (§07)</li>
+      <li><strong>One stage enum, four surfaces.</strong> The same pipeline stage is shown/edited on the dashboard board, the position table, the position board and the profile dropdown. The prototype already syncs them through a shared store (<code>src/lib/talentStore.ts</code>) — replace that store with the API, keep the behavior. (§03)</li>
+      <li><strong>Intelligence is offline.</strong> All LLM outputs (match score, assessment, criteria, questions) are generated once per event — after a call or at position creation — and stored. Nothing is generated at page load. (§08)</li>
+      <li><strong>Colors are rules, not data.</strong> Every traffic light in the UI is a deterministic threshold over a stored value. The complete rule list is §09 — implement it once, centrally.</li>
+    </ol>
+  </div>
+
+  <h3>Suggested build order</h3>
+  <table>
+    <thead><tr><th>Milestone</th><th>Scope</th><th>Unblocks</th></tr></thead>
+    <tbody>
+      <tr><td><strong>M1 — Schema + read APIs</strong></td><td>§07 tables, seed with the current mock values, <code>GET</code> endpoints (A.4). Frontend swaps constants for fetches — UI unchanged.</td><td>Everything renders from the DB</td></tr>
+      <tr><td><strong>M2 — Stage writes</strong></td><td><code>PATCH /applications/:id</code> + event log + <code>stage_entered_at</code> reset. Wire all three write surfaces (§03).</td><td>Board, dropdown &amp; table stay in sync; stall logic works</td></tr>
+      <tr><td><strong>M3 — LLM pipeline</strong></td><td>P1/P5 at position creation; P2/P3/P4 post-call; P6 on rejection (§08).</td><td>Real scores, assessments, questions</td></tr>
+      <tr><td><strong>M4 — Metrics &amp; geo</strong></td><td>Event rollup → <code>weekly_metrics</code>; geocoding at ingest; P7 weekly insight.</td><td>Hero numbers, statistics, map, funnels</td></tr>
+      <tr><td><strong>M5 — Cleanup</strong></td><td>Notes persistence, auth/client scoping, open decisions from §10 resolved. (Routes are already parameterized; one profile layout already in place.)</td><td>Production-ready</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Glossary — terms used throughout</h3>
+  <table>
+    <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Wandel</strong></td><td>The recruiting platform this dashboard belongs to. The UI shown here is the <em>client-facing</em> view (the hiring company's HR team).</td></tr>
+      <tr><td><strong>Client</strong></td><td>The hiring company (e.g. “Techbridge GmbH” in the hero). All data is scoped per client.</td></tr>
+      <tr><td><strong>Sophia</strong></td><td>The AI voice agent that calls every candidate in German and asks the position's screening questions. Its structured answers are the most important data source (tag <span class="tag sophia">Sophia Call</span>).</td></tr>
+      <tr><td><strong>Position</strong></td><td>One open role at one client (e.g. “Servicetechniker für Kaffeeautomaten”). Carries the JD, must-haves, budget and screening questions.</td></tr>
+      <tr><td><strong>Application</strong></td><td>One candidate matched to one position. Carries stage, match score, criteria, assessment, notes. The central record (§07).</td></tr>
+      <tr><td><strong>Stage</strong></td><td>Where an application stands in the decision pipeline: <code>rejected · new · shortlist · interview · offer · hired</code> (§03).</td></tr>
+      <tr><td><strong>Match score</strong></td><td>0–100 fit of a candidate for a position, LLM-generated post-call (P2). Shown in the table, comparison, profile header and cards.</td></tr>
+      <tr><td><strong>Must-have</strong></td><td>A hard K.o. criterion from the JD (e.g. “DGUV V3”, “Deutsch B2”). Evaluated per candidate as ✓ / partial / ✕ (R4).</td></tr>
+      <tr><td><strong>JD</strong></td><td>Job description. Parsed at position creation into five universal sections (5.3.1) plus hard facts.</td></tr>
+      <tr><td><strong>Kanban board / <code>PipelineBoard</code></strong></td><td>The drag-and-drop stage board. One shared component, used on the dashboard (all positions) and inside a position (scoped).</td></tr>
+      <tr><td><strong>Stalled / nudge</strong></td><td>An application sitting ≥ 5 days in a non-terminal stage — flagged so the recruiter acts (R5).</td></tr>
+      <tr><td><strong>Funnel (acquisition)</strong></td><td>The Sourcing → Screening → Matched curve on dashboard position cards. Decided definitions: Sourcing = applications via Meta lead ads, Screening = completed Sophia calls, Matched = matched to the position. Independent of the kanban stages.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ════════════════════════════ 01 ARCHITECTURE ════════════════════════════ -->
+<section class="doc-sec" id="architecture">
+  <div class="sec-head"><span class="no">01</span><h2>Architecture &amp; data flow</h2></div>
+  <p>Five upstream sources feed the database; the three feature areas read from it. The Sophia voice call is the most important source — most decision-relevant fields are structured answers from that call.</p>
+  <div class="flow"><pre>
+ SOURCES                          DATABASE                        UI (this document)
+ ────────────────────────         ─────────────────────────       ─────────────────────────────
+ <b>Meta Lead Ads / Forms</b>    ──┐                                  <span class="hl">04 · Dashboard</span>
+   name, phone, job_identifier    │     ┌──────────────────┐         hero metrics, funnels,
+                                  ├──▶  │  <b>candidates</b>        │         statistics, kanban board,
+ <b>Sophia call (ElevenLabs)</b> ──┤     │  <b>positions</b>         │         locations map, outreach
+   structured answers, transcript │     │  <b>applications</b>      │  ◀───
+   summary, audio                 │     │  (cand × position │      <span class="hl">05 · Position Workspace</span>
+                                  │     │   + stage, match) │         candidate table, kanban,
+ <b>LLM post-processing</b>      ──┤     │  <b>events / metrics</b>  │         comparison matrix,
+   assessment, match score,       │     │  <b>jd_documents</b>      │         job description + questions
+   screening questions            │     └──────────────────┘  ◀───
+                                  │                                <span class="hl">06 · Candidate Profile</span>
+ <b>Recruiter UI (manual)</b>    ──┤                                   header meta, assessment,
+   stage moves, notes             │                                   Q&amp;A, facts, experience,
+                                  │                                   notes, CV export
+ <b>System (computed)</b>        ──┘
+   deltas, histories, distances
+  </pre></div>
+  <p>
+    Key consequence of this architecture: <strong>the stage of an application is written once and read
+    everywhere</strong> (dashboard board, position table, position kanban, comparison, profile header,
+    profile evaluate-dropdown). See §03.
+  </p>
+</section>
+
+<!-- ════════════════════════════ 02 ROUTES ════════════════════════════ -->
+<section class="doc-sec" id="routes">
+  <div class="sec-head"><span class="no">02</span><h2>Routes &amp; information flow between pages</h2></div>
+  <table>
+    <thead><tr><th>Route</th><th>Component</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>/dashboard</code></td><td><code>src/dashboard/Dashboard.tsx</code></td><td>Client-facing overview: hero metrics, position funnels, statistics, kanban pipeline, outreach funnel.</td></tr>
+      <tr><td><code>/clients/positions/:positionId</code></td><td><code>src/positions/PositionWorkspace.tsx</code></td><td>One position's workspace: Candidate / Comparison / Job Description tabs. Parameterized by mock position id (<code>p1…p3</code>); <code>/clients/positions</code> without an id falls back to <code>p1</code>. Positions without seeded JD/screening data render explicit empty states.</td></tr>
+      <tr><td><code>/clients/positions/candidate/:id</code></td><td><code>src/positions/PositionCandidateDetail.tsx</code></td><td>Candidate profile (single layout, <code>ProfileFactsRail</code>). The back link resolves to the position the candidate is matched to.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Cross-page navigation map (must keep working)</h3>
+  <table>
+    <thead><tr><th>#</th><th>From</th><th>Action</th><th>To</th><th>Mechanism today</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">2.1</td><td>Dashboard · position card</td><td>“Review all candidates →”</td><td>Position workspace</td><td><code>/clients/positions/:positionId</code> via a title→id lookup (<code>POSITION_ID_BY_TITLE</code> <span class="tag mock">Mock</span> — becomes the position id on the record).</td></tr>
+      <tr><td class="idx">2.2</td><td>Dashboard · focus-card candidate row</td><td>click row</td><td>Candidate profile</td><td><code>/clients/positions/candidate/:id</code></td></tr>
+      <tr><td class="idx">2.3</td><td>Dashboard · map popup</td><td>click candidate name</td><td>Candidate profile</td><td><code>/clients/positions/candidate/:id</code></td></tr>
+      <tr><td class="idx">2.4</td><td>Dashboard · kanban card</td><td>click card body</td><td>Candidate profile</td><td><code>/clients/positions/candidate/:id</code></td></tr>
+      <tr><td class="idx">2.5</td><td>Position · candidate table row</td><td>click row</td><td>Candidate profile</td><td><code>/clients/positions/candidate/:id</code></td></tr>
+      <tr><td class="idx">2.6</td><td>Position · comparison row</td><td>“Profile” button</td><td>Candidate profile</td><td><code>/clients/positions/candidate/:id</code></td></tr>
+      <tr><td class="idx">2.7</td><td>Candidate profile</td><td>back link</td><td>Position workspace</td><td>resolves the candidate's matched position → <code>/clients/positions/:positionId</code></td></tr>
+    </tbody>
+  </table>
+  <div class="callout ok">
+    <strong>Identity model:</strong> the prototype has one canonical identity per candidate id
+    (<code>'1'…'8'</code>), defined in <code>src/lib/talentStore.ts</code> and consistent across every
+    surface — same name, city, match score and stage on the dashboard cards, the board, the table, the
+    comparison and the profile. In production keep this guarantee: ids are globally unique per candidate,
+    and position-scoped data (stage, match, comparison row) hangs off an <strong>application</strong>
+    (candidate × position), not the candidate itself. See §07.
+  </div>
+</section>
+
+<!-- ════════════════════════════ 03 STAGE MODEL ════════════════════════════ -->
+<section class="doc-sec" id="stages">
+  <div class="sec-head"><span class="no">03</span><h2>The canonical stage model — single source of truth</h2></div>
+  <p>
+    One stage enum drives four different UI surfaces. In the prototype it is defined exactly once —
+    <code>STAGES</code> in <code>src/lib/talentStore.ts</code> — and every surface imports it from there.
+    <strong>Keep that: in the backend it is one enum on the application record.</strong>
+  </p>
+  <table>
+    <thead><tr><th>Stage key</th><th>Label</th><th>Accent</th><th>Terminal?</th><th>Appears in</th></tr></thead>
+    <tbody>
+      <tr><td><code>rejected</code></td><td>Rejected</td><td><code>#ef4444</code></td><td>yes</td><td>Kanban, profile evaluate-dropdown</td></tr>
+      <tr><td><code>new</code></td><td>New</td><td><code>#3b82f6</code></td><td>—</td><td>all four surfaces</td></tr>
+      <tr><td><code>shortlist</code></td><td>Shortlisted</td><td><code>#6366f1</code></td><td>—</td><td>all four surfaces</td></tr>
+      <tr><td><code>interview</code></td><td>Interviewing</td><td><code>#a855f7</code></td><td>—</td><td>all four surfaces</td></tr>
+      <tr><td><code>offer</code></td><td>Offer Extended</td><td><code>#f59e0b</code></td><td>—</td><td>all four surfaces</td></tr>
+      <tr><td><code>hired</code></td><td>Hired</td><td><code>#16a34a</code></td><td>yes</td><td>Kanban, profile evaluate-dropdown</td></tr>
+    </tbody>
+  </table>
+  <p>The four surfaces and their current (duplicated) definitions:</p>
+  <table>
+    <thead><tr><th>#</th><th>Surface</th><th>File / constant</th><th>Stage subset</th><th>Writes?</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">3.1</td><td>Dashboard kanban board</td><td><code>Dashboard.tsx · PipelineBoard</code> (stages from the store)</td><td>all 6</td><td><span class="prop edit">Editable</span> drag &amp; drop → stage move</td></tr>
+      <tr><td class="idx">3.2</td><td>Position candidate table “Status”</td><td><code>PositionWorkspace.tsx · STATUS_PILL</code> (styles only — stage from the store)</td><td>all 6</td><td><span class="prop hard">Read-only</span> + filter dropdown</td></tr>
+      <tr><td class="idx">3.3</td><td>Position kanban view</td><td>re-uses <code>PipelineBoard</code> with <code>restrictPosition</code></td><td>all 6</td><td><span class="prop edit">Editable</span> drag &amp; drop</td></tr>
+      <tr><td class="idx">3.4</td><td>Profile “Evaluate Candidate” dropdown + header tag</td><td><code>ProfileFactsRail.tsx · EVAL_CATEGORIES = STAGES</code></td><td>all 6</td><td><span class="prop edit">Editable</span> select → stage move</td></tr>
+    </tbody>
+  </table>
+  <div class="callout ok">
+    <strong>Required behavior — already demonstrated in the prototype:</strong> all four surfaces read from
+    and write to one shared frontend store, <code>src/lib/talentStore.ts</code>. Drag a card on a kanban
+    board or pick a stage in the profile's evaluate dropdown, and the status pill in the table, the header
+    tag on the profile and the highlight tags on the dashboard cards all update instantly (days-in-stage
+    resets to 0 on every move). <strong>Your job:</strong> replace this in-memory store with the API — a
+    stage write must persist to <code>applications.stage</code>, reset
+    <code>applications.stage_entered_at = now()</code> and append a row to <code>application_events</code>.
+    The store module is documented and maps 1:1 to those fields.
+  </div>
+  <h3>Stalled / nudge logic</h3>
+  <p>
+    <span class="tag rule">Computed</span> A card is <em>stalled</em> when
+    <code>stage is not terminal AND days_in_stage ≥ 5</code> (<code>STALL_DAYS = 5</code> in
+    <code>Dashboard.tsx</code>). The board header shows “<code>N</code> need a nudge”; stalled cards get an
+    amber “<code>{days}d · nudge</code>” chip. <code>days_in_stage = floor((now − stage_entered_at) / 86400s)</code>.
+  </p>
+</section>
+
+<!-- ════════════════════════════ 04 DASHBOARD ════════════════════════════ -->
+<section class="doc-sec" id="dashboard">
+  <div class="sec-head"><span class="no">04</span><h2>Dashboard</h2></div>
+  <p>
+    <code>src/dashboard/Dashboard.tsx</code> (~2,000 lines, all mock data at the top of the file).
+    Five zones, top to bottom: Hero · Position Overview · Statistics · Candidate Pipeline (kanban) ·
+    Outreach Funnel.
+  </p>
+
+  <h3>4.1 Hero — “Talent Pipeline”</h3>
+  <figure class="shot">
+    <img src="img/dashboard-hero.png" alt="Dashboard hero with the three snapshot metrics" />
+    <figcaption>4.1 — Hero strip: eyebrow + title left; right the three categories from funnel + kanban — New Applications (+delta), Matched Candidates, Interviewing (live).</figcaption>
+  </figure>
+  <table>
+    <thead><tr><th>#</th><th>UI element</th><th>Today</th><th>Source</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">4.1.1</td><td><strong>New Applications</strong> + delta</td><td><code>HERO_APPLICATIONS</code> <span class="tag mock">Mock</span></td><td><span class="tag rule">Computed</span></td><td>Funnel volume: COUNT of applications received via Meta lead ads in the current ISO week (= sum of the positions' sourcing deltas); delta vs. previous week. Needs <code>applications.created_at</code>.</td></tr>
+      <tr><td class="idx">4.1.2</td><td><strong>Matched Candidates</strong></td><td>computed from <code>FOCUS_BY_TITLE</code> funnels</td><td><span class="tag rule">Computed</span></td><td>Funnel outcome: COUNT of candidates currently matched across all open positions (= sum of the funnel “Matched” values).</td></tr>
+      <tr><td class="idx">4.1.3</td><td><strong>Interviewing</strong></td><td>live from the talent store</td><td><span class="tag rule">Computed</span></td><td>Kanban action: <code>count(applications where stage = 'interview')</code>. In the prototype this reads the live stage store — drag a card into “Interviewing” and the hero updates instantly. Keep that behavior.</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Note:</strong> the calendar-week switcher was removed by design (10 Jun 2026). The hero is a current-state snapshot; week-over-week deltas remain. Do not rebuild a week selector.</p>
+
+  <h3>4.2 Position Overview — funnel focus cards</h3>
+  <p>
+    One card per open position, horizontally scrollable. Each card = header (title, candidate count, status
+    pill) + the funnel console + “This Week's Focus” candidate highlights + “Review all candidates →”.
+    Clicking the card expands it full-width with a horizontally scrolling strip of match-reasoning candidate
+    cards (<code>CandidateCard</code>, criteria checklists).
+  </p>
+  <figure class="shot">
+    <img src="img/dashboard-positions.png" alt="Position Overview with funnel focus cards" />
+    <figcaption>4.2 — Funnel focus cards: stage numbers ride the curve (centered above their labels, delta hanging right), “This Week's Focus” below.</figcaption>
+  </figure>
+  <table>
+    <thead><tr><th>#</th><th>UI element</th><th>Today</th><th>Source</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">4.2.1</td><td><strong>Funnel stages</strong> Sourcing / Screening / Matched</td><td><code>FOCUS_BY_TITLE[title].funnel</code> — 5-week history arrays <span class="tag mock">Mock</span></td><td><span class="tag rule">Computed</span></td><td><strong>Definitions (decided):</strong> <em>Sourcing</em> = COUNT of all applications received via Meta lead ads for the position; <em>Screening</em> = COUNT of completed Sophia calls; <em>Matched</em> = COUNT of candidates matched to the position. The kanban pipeline (§03) is independent of these funnel stages. Keep ≥ 2 weekly snapshots: current value + previous week → delta chip. The funnel curve scales heights against <code>FUNNEL_VALUE_MAX</code> = max value across all positions, so funnels are proportional <em>between</em> cards — preserve this.</td></tr>
+      <tr><td class="idx">4.2.2</td><td><strong>This Week's Focus</strong> list (3 shown, “Show N more”)</td><td><code>FOCUS_BY_TITLE[title].candidates</code> <span class="tag mock">Mock</span></td><td><span class="tag rule">Computed</span> + <span class="tag db">Database</span></td><td>Top-N applications for the position ordered by <code>match_score</code> desc, annotated with a tag: <code>interview</code> (“Interview Mo 10:00” — from scheduled interview slot), <code>ready</code> (“Matched”), <code>screening</code>, <code>new</code>. Fields per row: name, tag, city, earliest start date, salary expectation, match score (ring), avatar color.</td></tr>
+      <tr><td class="idx">4.2.3</td><td><strong>Candidate strip</strong> (expanded card)</td><td><code>CANDIDATES / CANDIDATES_MORE</code> <span class="tag mock">Mock</span></td><td><span class="tag llm">LLM</span> + <span class="tag sophia">Sophia Call</span></td><td>Per candidate: <code>fitPct</code> (= match score, §08-P2) and 3–5 <code>criteria</code> rows (<code>label</code>, optional <code>value</code>, <code>status: 'yes' | 'partial'</code>) — generated by the match-reasoning prompt (§08-P3) from JD requirements × call answers.</td></tr>
+      <tr><td class="idx">4.2.4</td><td><strong>Status pill</strong> “Active”</td><td><code>FocusData.status</code> <span class="tag mock">Mock</span></td><td><span class="tag db">Database</span></td><td><code>positions.status</code> mapped to label.</td></tr>
+      <tr><td class="idx">4.2.5</td><td><strong>“Review all candidates →”</strong></td><td><code>POSITION_PATH</code> lookup <span class="tag mock">Mock</span></td><td><span class="tag rule">Computed</span></td><td>Navigate to the position workspace by id (see 2.1).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.3 Statistics — activity, drop-off, locations map</h3>
+  <p>All three blocks share one position filter (<code>All positions / per-position</code> pill group).</p>
+  <figure class="shot">
+    <img src="img/dashboard-statistics.png" alt="Statistics section: weekly activity, drop-off diagnostics, Leaflet locations map" />
+    <figcaption>4.3 — Left column 50/50 split (activity + drop-off), right column the Leaflet map. Centered position filter on top.</figcaption>
+  </figure>
+  <table>
+    <thead><tr><th>#</th><th>UI element</th><th>Today</th><th>Source</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">4.3.1</td><td><strong>Weekly Activity</strong> — 4 KPIs + sparklines</td><td><code>WEEKLY_ACTIVITY_BY</code> 10-point trends <span class="tag mock">Mock</span></td><td><span class="tag rule">Computed</span></td><td>Per position-filter and per week: <em>candidates contacted</em>, <em>Sophia calls completed</em>, <em>advanced to screening</em>, <em>became interview-ready</em>. Headline = current week, delta vs. previous, sparkline = last 7 weekly values. Backed by an event table aggregated weekly (§07 <code>weekly_metrics</code>).</td></tr>
+      <tr><td class="idx">4.3.2</td><td><strong>Drop-off diagnostics</strong> — reason bars</td><td><code>DROPOFF_BY</code> <span class="tag mock">Mock</span></td><td><span class="tag rule">Computed</span> + <span class="tag sophia">Sophia Call</span></td><td>Distribution of <code>drop_reason</code> over rejected/withdrawn applications, as %, top 5. Reasons must be a fixed enum (A.2) classified per candidate at drop time (LLM classification from call/chat context — §08-P6 — or recruiter pick).</td></tr>
+      <tr><td class="idx">4.3.3</td><td><strong>Opportunity box</strong></td><td><code>DropOffData.opportunity</code> <span class="tag mock">Mock</span></td><td><span class="tag llm">LLM</span></td><td>One actionable sentence derived from the drop-off data (e.g. “8 candidates would accept at +200 € …”). Prompt §08-P7. Clearly an aggregate-level LLM output — regenerate weekly, cache.</td></tr>
+      <tr><td class="idx">4.3.4</td><td><strong>Candidate Locations</strong> — Leaflet map</td><td>derived from the talent store + <code>CITY_COORDS</code> <span class="tag mock">Mock</span></td><td><span class="tag rule">Computed</span></td><td>Group active applications by candidate city; geocode city → lat/lng once at ingest (store on candidate — the prototype uses a hard-coded city→coords map). Marker radius ∝ count. Popup lists candidate names (clickable → profile, 2.3). Tiles: CARTO Voyager; dark popup styles live in <code>src/index.css · .wandel-map-pop</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.4 Candidate Pipeline — kanban board</h3>
+  <p>
+    <code>PipelineBoard</code> (exported from <code>Dashboard.tsx</code>, reused by the position page).
+    Six lanes (§03), HTML5 drag &amp; drop, per-lane WIP count, stalled chips, position filter pills.
+    Lanes have a 250 px minimum width and scroll horizontally on smaller screens (do not change to wrapping).
+  </p>
+  <figure class="shot">
+    <img src="img/dashboard-pipeline.png" alt="Kanban pipeline board with six stage lanes" />
+    <figcaption>4.4 — Six lanes with WIP counts; stalled cards carry the amber “Nd · nudge” chip; cards are the same <code>CandidateCard</code> as 4.2.3.</figcaption>
+  </figure>
+  <table>
+    <thead><tr><th>#</th><th>UI element</th><th>Today</th><th>Source</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">4.4.1</td><td><strong>Cards</strong></td><td>canonical candidates joined with the live stage store <span class="tag mock">Mock</span></td><td><span class="tag db">Database</span></td><td>All active applications for the client. Card = <code>CandidateCard</code> (4.2.3 shape) + stage + <code>daysInStage</code> from the store.</td></tr>
+      <tr><td class="idx">4.4.2</td><td><strong>Drag &amp; drop</strong></td><td>local state only <span class="tag mock">Mock</span></td><td><span class="tag manual">Manual</span></td><td><code>PATCH /applications/:id { stage }</code> — optimistic UI, resets <code>daysInStage</code> to 0 (see §03 write rule).</td></tr>
+      <tr><td class="idx">4.4.3</td><td><strong>“N need a nudge”</strong> + per-card chip</td><td>computed from mock</td><td><span class="tag rule">Computed</span></td><td>Stall rule §03.</td></tr>
+      <tr><td class="idx">4.4.4</td><td><strong>Position filter</strong></td><td>title-string match</td><td><span class="tag rule">Computed</span></td><td>Filter by <code>position_id</code>. On the position page the board is mounted with <code>restrictPosition</code> + <code>hideFilter</code> — replace with a <code>positionId</code> prop.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.5 Outreach Funnel — channel flow chart</h3>
+  <p>
+    Decorative SVG flow (Meta Ads / Google Ads / job boards → Sophia → HR team → open positions) on a fixed
+    1160×770 canvas. <strong>Decided: this block is a visual showpiece, independent of real data — no backend
+    work at all.</strong> The layout is hand-tuned static UI; brand icons load from the Simple-Icons CDN with
+    initials fallback.
+  </p>
+  <figure class="shot">
+    <img src="img/dashboard-outreach.png" alt="Outreach funnel flow chart" />
+    <figcaption>4.5 — Channel flow: ad platforms + job boards → Sophia hub → HR team → open positions. Layout static; only counts are data.</figcaption>
+  </figure>
+</section>
+
+<!-- ════════════════════════════ 05 POSITION ════════════════════════════ -->
+<section class="doc-sec" id="position">
+  <div class="sec-head"><span class="no">05</span><h2>Position Workspace</h2></div>
+  <p>
+    <code>src/positions/PositionWorkspace.tsx</code>. Header (title + status pill) and three tabs:
+    <strong>Candidate</strong>, <strong>Comparison</strong>, <strong>Job Description</strong>. Parameterized by
+    position id (<code>/clients/positions/:positionId</code>, default <code>p1</code> — “Servicetechniker für
+    Kaffeeautomaten / Kaffee Partner GmbH”). The fully seeded demo position is p1; p2/p3 demonstrate the
+    pre-ingestion empty states for Comparison and Job Description.
+  </p>
+
+  <h3>5.1 Candidate tab — toolbar, list view, kanban view</h3>
+  <p>
+    Toolbar (grouped top-left, in this order): title + “<code>N</code> matched” count · <strong>List/Kanban
+    toggle</strong> · <strong>status dropdown</strong> (right of the toggle, list view only).
+  </p>
+  <figure class="shot">
+    <img src="img/position-candidates-list.png" alt="Candidate tab, list view with status pills and pagination" />
+    <figcaption>5.1 list view — toolbar top-left, the 7 columns, status pills per §03, 10 rows per page.</figcaption>
+  </figure>
+  <figure class="shot">
+    <img src="img/position-candidates-kanban.png" alt="Candidate tab, kanban view scoped to the position" />
+    <figcaption>5.1.9 kanban view — same <code>PipelineBoard</code> as the dashboard, scoped to the position, filter hidden.</figcaption>
+  </figure>
+  <table>
+    <thead><tr><th>#</th><th>UI element</th><th>Today</th><th>Source</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">5.1.1</td><td><strong>Candidate list</strong> — paginated table</td><td><code>mockCandidates.slice(0, candidateCount)</code> <span class="tag mock">Mock</span></td><td><span class="tag db">Database</span></td><td><code>GET /positions/:id/applications</code>. Page size 10 (<code>PAGE_SIZE</code>), Prev/Next + “x–y of N”. Row click → profile (2.5).</td></tr>
+      <tr><td class="idx">5.1.2</td><td>Column <strong>Candidate</strong></td><td>name + phone</td><td><span class="tag db">Database</span></td><td><code>first_name last_name</code>, <code>phone_number</code>, avatar initial.</td></tr>
+      <tr><td class="idx">5.1.3</td><td>Column <strong>Job Title</strong></td><td><code>c.jobTitle</code></td><td><span class="tag sophia">Sophia Call</span></td><td>Candidate's current/last job title.</td></tr>
+      <tr><td class="idx">5.1.4</td><td>Column <strong>Status</strong></td><td><code>STATUS_BY_ID</code> <span class="tag mock">Mock</span></td><td><span class="tag db">Database</span></td><td><code>applications.stage</code> → pill (§03). Filter dropdown “Status: All / …” filters this column server- or client-side.</td></tr>
+      <tr><td class="idx">5.1.5</td><td>Column <strong>Earliest Start</strong></td><td><code>c.earliestStart</code></td><td><span class="tag sophia">Sophia Call</span></td><td>Structured call answer.</td></tr>
+      <tr><td class="idx">5.1.6</td><td>Column <strong>Match</strong></td><td><code>MATCH_BY_ID</code> <span class="tag mock">Mock</span></td><td><span class="tag llm">LLM</span></td><td><code>applications.match_score</code> 0–100 (§08-P2). Color rule: ≥85 green · ≥70 amber · else grey.</td></tr>
+      <tr><td class="idx">5.1.7</td><td>Column <strong>Location</strong></td><td><code>c.city</code></td><td><span class="tag sophia">Sophia Call</span></td><td>Candidate city.</td></tr>
+      <tr><td class="idx">5.1.8</td><td>Column <strong>Salary</strong></td><td><code>c.salary</code></td><td><span class="tag sophia">Sophia Call</span></td><td>Salary expectation €/month, formatted <code>de-DE</code>.</td></tr>
+      <tr><td class="idx">5.1.9</td><td><strong>Kanban view</strong></td><td><code>PipelineBoard restrictPosition</code></td><td>—</td><td>Same board as 4.4 scoped to the position. Same write rule.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5.2 Comparison tab — decision matrix</h3>
+  <p>
+    One row per application — <strong>including rejected candidates</strong> (decided: the matrix documents
+    why someone is out). <strong>All columns sortable</strong> (header click, direction toggles; default
+    sort: Match desc). No expandable row, no dropdown, no footer legend — the “Profile” button is the only
+    way to details. Layout note: the grid uses content-sized columns (only Candidate flexes), so the gutter
+    between any two columns is the uniform grid gap — keep this when rebuilding.
+    Data today: <code>COMP_ROWS</code> <span class="tag mock">Mock</span>.
+  </p>
+  <figure class="shot">
+    <img src="img/position-comparison.png" alt="Comparison decision matrix with sortable columns" />
+    <figcaption>5.2 — Decision matrix: explicit must-have checklist (✓/–/✕), score bar, CEFR badge, salary-fit chip, distance, match number, Profile button.</figcaption>
+  </figure>
+  <table>
+    <thead><tr><th>#</th><th>Column</th><th>Source</th><th>Sort logic / display rule</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">5.2.1</td><td><strong>Candidate</strong> (avatar, name, current role)</td><td><span class="tag db">Database</span></td><td>Alphabetical, <code>localeCompare('de')</code>. First click ascending. Identity resolved from the talent store.</td></tr>
+      <tr><td class="idx">5.2.2</td><td><strong>Must-haves</strong> — checklist ✓/–/✕ with explicit labels (e.g. Training, DGUV V3, German B2)</td><td><span class="tag rule">Computed</span> from <span class="tag sophia">Sophia Call</span> × JD</td><td>Tri-state per knock-out criterion: <code>true | 'partial' | false</code>. The criteria <em>set</em> comes from the position's JD must-have block — per-position, not global. Sort: count fulfilled (✓=1, –=0.5, ✕=0), best first. Never use abbreviation tags (“AUS” reads as German “off”).</td></tr>
+      <tr><td class="idx">5.2.3</td><td><strong>Experience</strong> — 0–10 score bar</td><td><span class="tag llm">LLM</span></td><td>Relevant field-service/role experience scored from CV + call (§08-P4). ≥7.5 green · ≥5 amber · else red. Sort desc.</td></tr>
+      <tr><td class="idx">5.2.4</td><td><strong>German</strong> — CEFR badge</td><td><span class="tag sophia">Sophia Call</span></td><td>Enum <code>A1…C2 | Native</code>, assessed in the call. Display: ≥ B2 green, B1 amber, below red (threshold = JD requirement — parameterize per position). Sort by rank Native=7 … A1=1, best first.</td></tr>
+      <tr><td class="idx">5.2.5</td><td><strong>Salary</strong> — amount + fit chip</td><td><span class="tag sophia">Sophia Call</span> + <span class="tag rule">Computed</span></td><td>Fit vs. <code>positions.salary_budget</code> (today <code>COMP_BUDGET = 3500</code> <span class="tag mock">Mock</span>): ≤ budget “within budget” green · ≤ budget+500 “negotiable” amber · else “over budget” red. Sort asc (cheapest first).</td></tr>
+      <tr><td class="idx">5.2.6</td><td><strong>Start</strong></td><td><span class="tag sophia">Sophia Call</span> + <span class="tag rule">Computed</span></td><td>Earliest start date; sort by <code>days_until_start</code> asc; “Immediately” renders green.</td></tr>
+      <tr><td class="idx">5.2.7</td><td><strong>Mobility</strong> — “City · N km”</td><td><span class="tag rule">Computed</span></td><td>Distance candidate city → position location (geocode + haversine or routing API, computed once at ingest). Sort asc (closest first).</td></tr>
+      <tr><td class="idx">5.2.8</td><td><strong>Match</strong> — big colored number</td><td><span class="tag llm">LLM</span></td><td>Same <code>match_score</code> as 5.1.6. ≥80 green · ≥60 amber · else red. Default sort, desc.</td></tr>
+      <tr><td class="idx">5.2.9</td><td><strong>Profile</strong> button</td><td>—</td><td>Navigates to profile (2.6). Always visible, not sortable.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5.3 Job Description tab</h3>
+  <p>
+    Hero (title, employer, hard-facts chips, “Sophia screent mit N Fragen” badge) + the JD as one document.
+    Bullets that Sophia screens carry a spark chip; clicking the row expands the question inline as a quote
+    block. Questions not linked to a bullet render in a closing “Closing questions” section.
+  </p>
+  <figure class="shot">
+    <img src="img/position-jd.png" alt="Job Description tab with hero, universal sections and an expanded Sophia question" />
+    <figcaption>5.3 — Hero with hard-facts strip; the five universal sections; first “Responsibilities” bullet expanded showing its linked Sophia question; closing questions at the end.</figcaption>
+  </figure>
+  <table>
+    <thead><tr><th>#</th><th>UI element</th><th>Today</th><th>Source</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">5.3.1</td><td><strong>Sections + bullets</strong></td><td><code>JD_SECTIONS</code> <span class="tag mock">Mock</span></td><td><span class="tag db">Database</span> (<span class="tag llm">LLM</span>-assisted at ingest)</td><td>The five section categories are <strong>universal across all roles</strong>: <code>aufgaben · ausbildung · kompetenzen · rahmendaten · benefits</code> (fixed enum, fixed icons/accents). An LLM classifies raw JD bullets into these buckets at position-creation time (§08-P1); a human reviews once. Stored per position.</td></tr>
+      <tr><td class="idx">5.3.2</td><td><strong>Screening questions</strong></td><td><code>JD_QUESTIONS</code> <span class="tag mock">Mock</span></td><td><span class="tag llm">LLM</span> + <span class="tag manual">Manual</span></td><td>Generated from the JD (§08-P5), editable by the recruiter, stored in call order. Each question optionally references one bullet (<code>bullet.q → question.id</code>) — that link drives the inline expansion.</td></tr>
+      <tr><td class="idx">5.3.3</td><td><strong>Hard-facts strip</strong></td><td><code>JD_FACTS</code> <span class="tag mock">Mock</span></td><td><span class="tag db">Database</span></td><td>Location · German requirement · Start · Hours · Salary — structured fields on the position record (extracted at ingest, same §08-P1 pass).</td></tr>
+    </tbody>
+  </table>
+  <div class="callout ok">
+    <strong>Important consistency rule:</strong> the JD's must-have bullets, the Comparison must-have columns
+    (5.2.2), the salary budget (5.2.5), the German-level threshold (5.2.4) and Sophia's question set (5.3.2)
+    are all views of the <em>same position record</em>. Model them once (§07 <code>positions</code> +
+    <code>jd_bullets</code> + <code>screening_questions</code>) so they can never drift apart.
+  </div>
+</section>
+
+<!-- ════════════════════════════ 06 CANDIDATE ════════════════════════════ -->
+<section class="doc-sec" id="candidate">
+  <div class="sec-head"><span class="no">06</span><h2>Candidate Profile</h2></div>
+  <p>
+    <code>src/positions/PositionCandidateDetail.tsx</code> renders <strong>one layout for all candidates</strong>:
+    <code>ProfileFactsRail</code> (“Dossier”). The earlier design-exploration layouts were removed.
+  </p>
+
+  <figure class="shot">
+    <img src="img/profile-full.png" alt="Candidate profile (ProfileFactsRail layout)" />
+    <figcaption>§06 — Full profile: header strip with stage tag, match badge and last Sophia call; sticky facts rail left; assessment flip-card, experience timeline and education right.</figcaption>
+  </figure>
+
+  <h3>6.1 Header strip</h3>
+  <table>
+    <thead><tr><th>#</th><th>UI element</th><th>Today</th><th>Source</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">6.1.1</td><td><strong>Name, job title, avatar</strong></td><td><code>mockCandidates</code></td><td><span class="tag db">Database</span></td><td>Candidate record.</td></tr>
+      <tr><td class="idx">6.1.2</td><td><strong>Stage tag</strong> “New · 6d”</td><td><code>evalKey</code> state + <code>DAYS_IN_STAGE_BY_ID</code> <span class="tag mock">Mock</span></td><td><span class="tag db">Database</span> + <span class="tag rule">Computed</span></td><td><code>applications.stage</code> + <code>days_in_stage</code> (§03). <span class="prop hard">Read-only</span> here; written via 6.1.5.</td></tr>
+      <tr><td class="idx">6.1.3</td><td><strong>Match badge</strong> “Match 84”</td><td><code>MATCH_BY_ID</code> <span class="tag mock">Mock</span></td><td><span class="tag llm">LLM</span></td><td><code>match_score</code> with ≥80/≥60 color rule. Same value as 5.1.6 / 5.2.8 — single stored field.</td></tr>
+      <tr><td class="idx">6.1.4</td><td><strong>“Sophia-Call · date”</strong></td><td><code>candidate.lastContactAt</code></td><td><span class="tag rule">Computed</span></td><td>Timestamp of the last completed Sophia call (system event).</td></tr>
+      <tr><td class="idx">6.1.5</td><td><strong>Evaluate Candidate</strong> dropdown</td><td>local state <span class="tag mock">Mock</span></td><td><span class="tag manual">Manual</span></td><td>Stage move (§03 write rule). <span class="prop edit">Editable</span>. Options = the 6 canonical stages.</td></tr>
+      <tr><td class="idx">6.1.6</td><td><strong>Download CV</strong></td><td>opens <code>CvDocument</code> overlay</td><td>—</td><td>Pure frontend: renders the “Aurora” DIN-A4 CV from the candidate record and calls <code>window.print()</code>. Print CSS in the component. No backend needed beyond complete candidate data.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.2 Left rail — facts &amp; notes</h3>
+  <table>
+    <thead><tr><th>#</th><th>UI element</th><th>Source</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">6.2.1</td><td><strong>Contact &amp; Person</strong> (phone, email, birthday+age, address, nationality)</td><td><span class="tag db">Database</span></td><td>Candidate record; age computed from <code>date_of_birth</code>.</td></tr>
+      <tr><td class="idx">6.2.2</td><td><strong>Conditions</strong> (German level, driver's licence, notice period, salary expectation)</td><td><span class="tag sophia">Sophia Call</span></td><td>Structured call answers. German level renders as a pill.</td></tr>
+      <tr><td class="idx">6.2.3</td><td><strong>Notes</strong> textarea + Save</td><td><span class="tag manual">Manual</span></td><td><span class="prop edit">Editable</span>. Today: local state, “Saved ✓” is fake. Needs <code>notes</code> table (per application, author, timestamp) + <code>POST/GET</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.3 Right column — assessment, Q&amp;A, experience, education</h3>
+  <table>
+    <thead><tr><th>#</th><th>UI element</th><th>Source</th><th>Definition</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">6.3.1</td><td><strong>Our Assessment</strong> (flip-card front)</td><td><span class="tag llm">LLM</span></td><td><code>candidate.assessment</code> — 3–5 sentence verdict generated post-call (§08-P2, same pass as the match score so text and number agree). Regenerate when call data changes.</td></tr>
+      <tr><td class="idx">6.3.2</td><td><strong>Motivation to change</strong> — single-line strip under the assessment</td><td><span class="tag sophia">Sophia Call</span></td><td><code>job_change_motivation</code>, one sentence. Strip is intentionally thin (icon + label + text on one line) — keep it.</td></tr>
+      <tr><td class="idx">6.3.3</td><td><strong>Client Questions</strong> (flip-card back, Q&amp;A button)</td><td><span class="tag db">Database</span> + <span class="tag sophia">Sophia Call</span></td><td><code>client_questions[]</code> — client-supplied questions Sophia asked verbatim; answers quoted from the transcript. Quote-stroke styling (no boxes).</td></tr>
+      <tr><td class="idx">6.3.4</td><td><strong>Experience</strong> timeline</td><td><span class="tag sophia">Sophia Call</span> / CV parse</td><td><code>experiences[]</code> = { role, company, period, location?, description }. The <strong>period renders as a prominent date chip above the role</strong> — keep.</td></tr>
+      <tr><td class="idx">6.3.5</td><td><strong>Education &amp; Training</strong> cards</td><td><span class="tag sophia">Sophia Call</span> / CV parse</td><td><code>education[]</code> = { qualification, institution, period, type: ausbildung|studium|lehre|weiterbildung }.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.4 CV export (“Aurora” template)</h3>
+  <p>
+    Triggered by <strong>Download CV</strong> (6.1.6). Pure frontend rendering of the candidate record into a
+    DIN-A4 sheet (794 px width, min-height 1123 px) with print CSS — “Download PDF” calls
+    <code>window.print()</code>. Everything on the sheet maps 1:1 to candidate fields; no extra backend work
+    beyond complete data.
+  </p>
+  <figure class="shot narrow">
+    <img src="img/profile-cv.png" alt="Aurora CV template, DIN A4" />
+    <figcaption>6.4 — The generated CV: hero with chips, contact/language/conditions rail, profile text (= assessment), experience, education.</figcaption>
+  </figure>
+</section>
+
+<!-- ════════════════════════════ 07 SCHEMA ════════════════════════════ -->
+<section class="doc-sec" id="schema">
+  <div class="sec-head"><span class="no">07</span><h2>Database schema (proposal)</h2></div>
+  <p>
+    Minimal relational model that covers every field the three feature areas read. Naming is suggestive —
+    adapt to your conventions, keep the relations. The shape in one line: <strong>a candidate and a position
+    meet in an application; everything decision-related hangs off the application.</strong>
+  </p>
+  <div class="flow"><pre>
+ <b>candidates</b>                                            <b>positions</b>
+   · experiences, education                             · jd_bullets (5 universal sections)
+   · call answers (German, salary, start, …)            · screening_questions
+        │                                               · hard facts, budget, must-haves
+        │                                                    │
+        └──────────────▶   <b>applications</b>   ◀────────────────┘
+                           <span class="hl">candidate × position — the central record</span>
+                           · stage + stage_entered_at        (§03)
+                           · match_score, experience_score   (LLM P2/P4)
+                           · criteria, must-have states      (LLM P3, rule R4)
+                           · assessment, notes, drop_reason
+                                │
+                                └──▶ <b>application_events</b> ──▶ <b>weekly_metrics</b> (rollup)
+                                     audit trail              hero + statistics
+  </pre></div>
+  <pre><code>candidates
+  id            uuid PK
+  first_name, last_name, phone_number, email, address, city
+  lat, lng                      -- geocoded once from city (4.3.4, 5.2.7)
+  date_of_birth, nationality
+  german_level                  -- enum A1..C2|Native          (Sophia call)
+  drivers_license bool, license_classes
+  salary_expectation int        -- €/month                     (Sophia call)
+  earliest_start date, notice_period
+  job_title                     -- current/last role           (Sophia call)
+  job_change_motivation text    -- one sentence                (Sophia call)
+  special_skills text
+  source_channel                -- enum sophia|whatsapp|instagram|facebook|metaads
+  last_contact_at timestamptz   -- last completed Sophia call  (system)
+  created_at timestamptz
+
+candidate_experiences (id, candidate_id FK, role, company, period, location, description, sort)
+candidate_education   (id, candidate_id FK, qualification, institution, period, type)
+
+positions
+  id            uuid PK
+  client_id FK, title, employer, status      -- enum open|in_progress|complete
+  location_city, location_lat, location_lng
+  salary_budget int             -- drives 5.2.5 fit chip
+  german_required               -- enum, drives 5.2.4 threshold
+  weekly_hours, start_terms, contract_terms  -- hard-facts strip 5.3.3
+  created_at
+
+jd_bullets
+  id, position_id FK
+  section       -- enum aufgaben|ausbildung|kompetenzen|rahmendaten|benefits  (universal!)
+  text, is_must_have bool, sort
+
+screening_questions
+  id, position_id FK
+  text, call_order int
+  jd_bullet_id FK nullable      -- the bullet the question screens (5.3.2 link)
+
+applications                    -- candidate × position; THE central record
+  id uuid PK
+  candidate_id FK, position_id FK   (unique together)
+  stage         -- enum rejected|new|shortlist|interview|offer|hired  (§03)
+  stage_entered_at timestamptz      -- drives days_in_stage / stall logic
+  match_score smallint              -- 0..100, LLM P2
+  experience_score numeric(3,1)     -- 0..10, LLM P4
+  drop_reason   -- enum, nullable (A.2)
+  created_at
+
+application_criteria            -- match-reasoning checklist, LLM P3
+  id, application_id FK, label, value nullable, status -- 'yes'|'partial'
+application_musthaves           -- tri-state per JD must-have, rule §09-R4
+  id, application_id FK, jd_bullet_id FK, state -- 'true'|'partial'|'false'
+
+application_events  (id, application_id FK, type, payload jsonb, created_at)
+  -- stage_changed, call_completed, contacted, … feeds 4.3.1 + audit
+notes               (id, application_id FK, author_id, text, created_at)
+client_questions    (id, application_id FK, question, answer, sort)
+assessments         (application_id FK, text, generated_at, model, prompt_version)
+interviews          (id, application_id FK, scheduled_at)   -- feeds 4.2.2 tags
+
+weekly_metrics                  -- materialized weekly rollup, feeds 4.1/4.2.1/4.3.1
+  client_id, position_id nullable, iso_week
+  contacted, calls_completed, advanced_screening, interview_ready
+  funnel_sourcing, funnel_screening, funnel_matched</code></pre>
+  <div class="callout">
+    <strong>Why <code>applications</code> matters:</strong> stage, match score, criteria, must-haves, notes and
+    assessment are all <em>per position</em>, not per person. The prototype blurs this (one global
+    <code>mockCandidates</code>); the schema above fixes it. A candidate appearing in two positions has two
+    application rows with independent stages and scores.
+  </div>
+</section>
+
+<!-- ════════════════════════════ 08 LLM ════════════════════════════ -->
+<section class="doc-sec" id="llm">
+  <div class="sec-head"><span class="no">08</span><h2>LLM tasks &amp; prompts</h2></div>
+  <p>
+    Seven model tasks replace the mocked intelligence. All are <strong>batch/offline</strong> (post-call or
+    at position creation) — nothing is generated at page-render time. Store outputs with
+    <code>model + prompt_version + generated_at</code> so they can be regenerated. Prompts below are ready to
+    use; expected output is strict JSON (validate against the given schema, retry once on parse failure).
+  </p>
+
+  <h4>Overview — what runs when</h4>
+  <table>
+    <thead><tr><th>#</th><th>Task</th><th>Trigger</th><th>Input</th><th>Output → stored in</th><th>Shown in UI</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">P1</td><td>Parse JD into universal sections + hard facts</td><td>Position created / JD edited</td><td>Raw JD text</td><td><code>jd_bullets</code>, position hard-fact fields</td><td>5.3 JD tab, 5.2.2 must-have set</td></tr>
+      <tr><td class="idx">P2</td><td>Match score + written assessment (one pass)</td><td>Sophia call completed</td><td>Call answers + transcript + JD</td><td><code>applications.match_score</code>, <code>assessments.text</code></td><td>Match everywhere; “Our Assessment” (6.3.1)</td></tr>
+      <tr><td class="idx">P3</td><td>Card criteria checklist (✓/partial)</td><td>Same pass as P2</td><td>same</td><td><code>application_criteria</code></td><td>Dashboard cards 4.2.3, kanban cards 4.4.1</td></tr>
+      <tr><td class="idx">P4</td><td>Experience score 0–10</td><td>Same pass as P2</td><td>same</td><td><code>applications.experience_score</code></td><td>Comparison 5.2.3</td></tr>
+      <tr><td class="idx">P5</td><td>Generate screening questions</td><td>After P1, recruiter reviews</td><td><code>jd_bullets</code></td><td><code>screening_questions</code></td><td>JD tab 5.3.2; drives the Sophia call</td></tr>
+      <tr><td class="idx">P6</td><td>Classify drop reason</td><td>Application rejected / withdrawn</td><td>Last context + notes</td><td><code>applications.drop_reason</code></td><td>Drop-off bars 4.3.2</td></tr>
+      <tr><td class="idx">P7</td><td>Opportunity insight (one sentence)</td><td>Weekly cron</td><td>90-day drop-off data</td><td>cached per client/position</td><td>Opportunity box 4.3.3</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Deployment — embedding the tasks in AWS</h4>
+  <p>
+    Reuse the pattern from the existing call-analyser: <strong>AWS Bedrock</strong> for inference,
+    event-driven and serverless around it. Nothing here is realtime.
+  </p>
+  <div class="flow"><pre>
+ EVENTS                          ORCHESTRATION                      INFERENCE + STORAGE
+ ─────────────────────           ───────────────────────────        ─────────────────────────
+ ElevenLabs webhook        ──▶   EventBridge bus                    Bedrock (Claude, JSON out)
+   call.completed                  │                                     │
+ Backend events                    ├─ Step Function "post-call"  ──▶  P2+P3+P4 as ONE call
+   position.created                │    validate JSON → write DB         │
+   application.rejected            ├─ Lambda "position-ingest"   ──▶  P1 then P5 → pending review
+                                   ├─ Lambda "drop-reason"       ──▶  P6 (skip if recruiter chose)
+ EventBridge Scheduler     ──▶     └─ Lambda "weekly-insight"    ──▶  P7 → cache in weekly_metrics
+   weekly cron
+                                   All writes → RDS Postgres (§07)
+                                   Prompt I/O logged to S3 (evals, debugging)
+  </pre></div>
+  <ul class="plain">
+    <li><strong>P2/P3/P4 are one Bedrock call</strong> — same input, one combined JSON schema. Step Functions handles retries (one retry on schema-validation failure, then dead-letter + alert).</li>
+    <li><strong>P5 output is “pending review”</strong> — the recruiter confirms/edits the questions in the UI before the position goes live.</li>
+    <li><strong>Prompts live in the repo</strong>, versioned; every stored output carries <code>model + prompt_version + generated_at</code> so results can be regenerated after prompt changes.</li>
+    <li><strong>No realtime constraints</strong> — no streaming, no provisioned throughput. On-demand Bedrock is sufficient.</li>
+  </ul>
+
+  <h4>P1 · JD ingestion — classify bullets into the 5 universal sections + extract hard facts</h4>
+  <p>Trigger: position created/updated. Input: raw JD text. Output → <code>jd_bullets</code>, <code>positions</code> hard-fact fields.</p>
+  <pre><code>SYSTEM
+Du bist ein Parser für Stellenanzeigen im Blue-Collar-Recruiting. Du bekommst den Rohtext
+einer Job Description. Zerlege ihn in einzelne Bullet Points und ordne jeden GENAU EINER
+dieser universellen Kategorien zu:
+- "aufgaben"      (Tätigkeiten, Verantwortung)
+- "ausbildung"    (geforderte/erwünschte Abschlüsse, Quereinstieg)
+- "kompetenzen"   (Fähigkeiten, Berufserfahrung, Soft Skills)
+- "rahmendaten"   (Start, Befristung, Arbeitszeit, Gehalt, Einarbeitung, Bereitschaftsdienst)
+- "benefits"      (Zusatzleistungen)
+Markiere Bullets, die ein hartes K.o.-Kriterium sind ("Must-have", "zwingend", "Voraussetzung"),
+mit is_must_have=true. Extrahiere zusätzlich die Hard Facts.
+Antworte NUR mit JSON nach diesem Schema:
+{ "bullets":[{ "section":"...", "text":"...", "is_must_have":bool }],
+  "hard_facts":{ "standort":"...", "deutsch_min":"B2", "start":"...",
+                 "pensum_std_woche":40, "gehalt_range":"...", "salary_budget_eur":3500 } }
+
+USER
+&lt;JD-Rohtext&gt;</code></pre>
+
+  <h4>P2 · Post-call candidate evaluation — match score + written assessment</h4>
+  <p>Trigger: Sophia call completed (or call data edited). One pass produces <em>both</em> the score and the assessment text so they never contradict each other. Output → <code>applications.match_score</code>, <code>assessments.text</code>.</p>
+  <pre><code>SYSTEM
+Du bist ein erfahrener Recruiter im Blue-Collar-Bereich. Bewerte die Passung eines Kandidaten
+auf eine konkrete Stelle. Dir liegen vor: (a) die strukturierten Antworten aus dem
+Sophia-Screening-Call, (b) das Call-Transkript, (c) die Job Description inkl. Must-haves
+und Budget.
+Regeln:
+- match_score 0–100. Nicht erfüllte Must-haves deckeln den Score auf max. 49.
+- Teilweise erfüllte Must-haves (z.B. Zertifikat muss aufgefrischt werden) deckeln auf max. 84.
+- Gewichte: Must-haves &gt; relevante Erfahrung &gt; Verfügbarkeit/Gehaltsfit &gt; Soft Signals.
+- assessment: 3–5 Sätze auf ENGLISCH (UI-Sprache), konkret und entscheidungsorientiert.
+  Nenne die wichtigste Stärke, das größte Risiko und eine klare Empfehlung. Keine Floskeln,
+  keine Wiederholung von Tabellenwerten ohne Einordnung.
+Antworte NUR mit JSON:
+{ "match_score": int, "assessment": "..." }
+
+USER
+JOB DESCRIPTION: &lt;jd_bullets + hard_facts&gt;
+CALL-ANTWORTEN: &lt;structured answers&gt;
+TRANSKRIPT: &lt;transcript&gt;</code></pre>
+
+  <h4>P3 · Match-reasoning criteria — the ✓/partial checklist on candidate cards</h4>
+  <p>Trigger: same pass as P2 (can be one combined call). Output → <code>application_criteria</code> (3–5 rows). Used on dashboard cards (4.2.3) and kanban cards (4.4.1).</p>
+  <pre><code>SYSTEM
+Erzeuge für den Kandidaten 3–5 stichpunktartige Match-Kriterien für eine Karten-Ansicht.
+Jedes Kriterium: label (max. 4 Wörter, Englisch wie im UI üblich, z.B. "DGUV V3 certified",
+"Field service experience"), optional value (z.B. "8 yrs", "23 km", "+200 €"),
+status "yes" (klar erfüllt) oder "partial" (mit Einschränkung).
+Wähle die entscheidungsrelevantesten Kriterien aus JD-Anforderungen × Call-Antworten.
+Mindestens ein Kriterium muss Gehalts- oder Distanz-Fit abdecken.
+NUR JSON: { "criteria":[{ "label":"...", "value":"...", "status":"yes|partial" }] }</code></pre>
+
+  <h4>P4 · Experience score (0–10) for the comparison matrix</h4>
+  <p>Trigger: same post-call pass. Output → <code>applications.experience_score</code> (5.2.3).</p>
+  <pre><code>SYSTEM
+Bewerte die RELEVANTE Berufserfahrung des Kandidaten für genau diese Stelle auf einer Skala
+0–10 (eine Nachkommastelle erlaubt). 10 = langjährige, unmittelbar einschlägige Erfahrung
+inkl. Spezialkenntnissen; 5 = verwandte Erfahrung mit Transferaufwand; 0 = keine relevante
+Erfahrung. Berücksichtige Jahre, Nähe der Tätigkeit und Eigenverantwortung.
+NUR JSON: { "experience_score": number, "basis": "1 Satz Begründung (intern)" }</code></pre>
+
+  <h4>P5 · Screening-question generation from the JD</h4>
+  <p>Trigger: position created (after P1). Recruiter reviews/edits before activation. Output → <code>screening_questions</code> incl. the bullet link.</p>
+  <pre><code>SYSTEM
+Erzeuge aus der Job Description die Screening-Fragen für den Sophia-Voice-Call (Deutsch,
+Sie-Form, telefontauglich kurz). Regeln:
+- Genau EINE Frage pro Must-have-Bullet (verweise auf dessen bullet_id).
+- Je eine Frage zu: frühestem Eintrittsdatum, Gehaltsvorstellung (brutto/Monat).
+- Abschlussfrage: "Welche Fragen haben Sie an uns?"
+- Maximal 8 Fragen, in sinnvoller Call-Reihenfolge.
+- Liefere zu jeder Frage zusätzlich text_en (englische Übersetzung für die UI-Anzeige).
+NUR JSON: { "questions":[{ "call_order":int, "text":"...", "text_en":"...", "jd_bullet_id":"...|null" }] }</code></pre>
+
+  <h4>P6 · Drop-reason classification</h4>
+  <p>Trigger: application moves to <code>rejected</code> / candidate withdraws. Output → <code>applications.drop_reason</code> (enum A.2). Skip the LLM when the recruiter picks a reason manually.</p>
+  <pre><code>SYSTEM
+Klassifiziere, warum dieser Kandidat aus dem Prozess gefallen ist. Wähle GENAU EINE Kategorie:
+"salary_gap" | "location" | "skill_gap" | "not_interested" | "no_response" | "other".
+Grundlage: letzter Gesprächskontext, Call-Antworten, ggf. Recruiter-Notiz.
+NUR JSON: { "drop_reason":"...", "confidence":0..1 }</code></pre>
+
+  <h4>P7 · Opportunity insight (statistics box)</h4>
+  <p>Trigger: weekly cron per client + per position filter. Output cached in <code>weekly_metrics</code> or its own table (4.3.3).</p>
+  <pre><code>SYSTEM
+Du bekommst die Drop-off-Verteilung und die zugehörigen Kandidatendaten einer Position
+(bzw. aller Positionen) der letzten 90 Tage. Formuliere GENAU EINE konkrete, quantifizierte
+Handlungsempfehlung für den Kunden (max. 30 Wörter, Englisch wie im UI), z.B.
+"8 candidates would accept at +200€ above your current offer. Worth discussing your salary band."
+Nur empfehlen, was die Daten belegen. NUR JSON:
+{ "count":"8 candidates", "before":"would accept at", "money":"+200€", "after":"above your current offer. ..." }
+("money" weglassen, wenn kein Geldbetrag relevant ist.)</code></pre>
+</section>
+
+<!-- ════════════════════════════ 09 RULES ════════════════════════════ -->
+<section class="doc-sec" id="rules">
+  <div class="sec-head"><span class="no">09</span><h2>Deterministic rules reference</h2></div>
+  <p>Every traffic light / threshold in the UI, in one place. Implement once in the backend (or a shared lib) — the frontend only maps value → color.</p>
+  <table>
+    <thead><tr><th>#</th><th>Rule</th><th>Definition</th><th>Used in</th></tr></thead>
+    <tbody>
+      <tr><td class="idx">R1</td><td><strong>Match color</strong></td><td>≥80 green <code>#34d399</code> · ≥60 amber <code>#fbbf24</code> · else red <code>#fb7185</code> (comparison/profile). Table variant 5.1.6: ≥85 green · ≥70 amber · else grey.</td><td>5.1.6 · 5.2.8 · 6.1.3</td></tr>
+      <tr><td class="idx">R2</td><td><strong>Salary fit</strong></td><td>≤ budget → “im Budget” green · ≤ budget+500 → “verhandelbar” amber · else “über Budget” red.</td><td>5.2.5</td></tr>
+      <tr><td class="idx">R3</td><td><strong>German level</strong></td><td>≥ JD requirement green · one level below amber · lower red. Rank: A1&lt;A2&lt;B1&lt;B2&lt;C1&lt;C2&lt;Native.</td><td>5.2.4</td></tr>
+      <tr><td class="idx">R4</td><td><strong>Must-have tri-state</strong></td><td><code>true</code> = explicitly confirmed in call/CV · <code>partial</code> = confirmed with caveat (e.g. certificate refresh needed) · <code>false</code> = not met. Derived per JD must-have bullet from the structured call answer; <code>partial</code> requires an explanatory note in the data.</td><td>5.2.2</td></tr>
+      <tr><td class="idx">R5</td><td><strong>Stall / nudge</strong></td><td>non-terminal stage AND <code>days_in_stage ≥ 5</code>.</td><td>4.4.3 · §03</td></tr>
+      <tr><td class="idx">R6</td><td><strong>Experience color</strong></td><td>≥7.5 green · ≥5 amber · else red.</td><td>5.2.3</td></tr>
+      <tr><td class="idx">R7</td><td><strong>Funnel proportionality</strong></td><td>Funnel half-height = <code>value / max(all stage values across all positions) × H_MAX</code>. Numbers ride the curve; delta = current − previous week.</td><td>4.2.1</td></tr>
+      <tr><td class="idx">R8</td><td><strong>Distance</strong></td><td>Haversine(candidate.latlng, position.latlng), rounded to km, computed at ingest.</td><td>5.2.7 · cards</td></tr>
+      <tr><td class="idx">R9</td><td><strong>Start sort key</strong></td><td><code>days_until_start = max(0, earliest_start − today)</code>; “Sofort” = 0.</td><td>5.2.6</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ════════════════════════════ 10 MISSING ════════════════════════════ -->
+<section class="doc-sec" id="missing">
+  <div class="sec-head"><span class="no">10</span><h2>What is missing / open decisions</h2></div>
+
+  <h3>Not implemented in the prototype (backend must add)</h3>
+  <ul class="plain">
+    <li><strong>Persistence everywhere</strong> — stage moves, notes, question edits are all local React state.</li>
+    <li><strong>Position data beyond p1</strong> — routes are parameterized (<code>:positionId</code>), but JD/screening/comparison content is only seeded for p1; other positions show empty states until the JD-ingestion pipeline (P1/P5) exists.</li>
+    <li><strong>Auth / client scoping</strong> — the dashboard greets “Techbridge GmbH” statically; every query in §07 is implicitly <code>WHERE client_id = …</code>.</li>
+    <li><strong>Stage persistence</strong> — the four surfaces already sync via the in-memory store (§03), but a page reload resets everything; stage writes must go to the API.</li>
+    <li><strong>Interview scheduling</strong> — “Interview Mo 10:00” tags (4.2.2) imply an <code>interviews</code> table that doesn't exist anywhere yet.</li>
+    <li><strong>Real notes</strong> — author, timestamps, list of past notes (6.2.3).</li>
+    <li><strong>Event pipeline</strong> — weekly metrics (4.1, 4.3.1) need <code>application_events</code> + a weekly rollup job.</li>
+    <li><strong>Geocoding</strong> — city → lat/lng at ingest for map + distance (R8).</li>
+  </ul>
+
+  <h3>Decided (10 Jun 2026)</h3>
+  <div class="qa">
+    <p class="t">Resolved — implement as specified</p>
+    <ul>
+      <li><strong>Hero metrics</strong> (4.1): the three most important categories from funnel + kanban — New Applications (funnel volume, weekly + delta) · Matched Candidates (funnel outcome) · Interviewing (kanban stage count, live).</li>
+      <li><strong>Funnel stage mapping</strong> (4.2.1): Sourcing = COUNT applications via Meta lead ads · Screening = COUNT completed Sophia calls · Matched = COUNT matched to the position. The kanban pipeline is independent.</li>
+      <li><strong>Comparison candidate set</strong> (5.2): all matched candidates of the position, <em>including</em> rejected ones — the matrix documents why someone is out.</li>
+      <li><strong>Match score</strong>: deferred — not relevant for the first iteration. Treat the P2 caps (49/84) as placeholders; ship the score plumbing, revisit the model later.</li>
+      <li><strong>Outreach funnel</strong> (4.5): purely decorative, independent of real data. No backend work — the channel counts stay static.</li>
+      <li><strong>Dashboard secondary cards</strong>: legacy <code>PULSE_BY_TITLE</code> / plain <code>PositionCard</code> variants were removed from the codebase; every position renders the focus card.</li>
+    </ul>
+  </div>
+
+  <h3>Known prototype quirks (do not replicate)</h3>
+  <ul class="plain">
+    <li>The shared store lives in browser memory — a full page reload resets all stage moves to the seed values in <code>talentStore.ts</code>.</li>
+    <li>The “Saved ✓” note button fakes success.</li>
+    <li>Avatar colors are stored per candidate in <code>talentStore.ts</code> — generate deterministically from the id hash instead.</li>
+    <li>Aggregate numbers are scaled to the 8-candidate demo pool and internally consistent (funnel “Matched” = pool per position, weekly activity “all” = sum of the per-position trends, hero growth = sum of this week's sourcing deltas). Acquisition-side counts (Sourcing, contacted) are intentionally larger than the matched pool.</li>
+  </ul>
+</section>
+
+<!-- ════════════════════════════ APPENDIX ════════════════════════════ -->
+<section class="doc-sec" id="appendix">
+  <div class="sec-head"><span class="no">A</span><h2>Appendix</h2></div>
+
+  <h3>A.1 Enums</h3>
+  <table>
+    <thead><tr><th>Enum</th><th>Values</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><code>stage</code></td><td><code>rejected · new · shortlist · interview · offer · hired</code></td><td>§03; terminal: rejected, hired</td></tr>
+      <tr><td><code>jd_section</code></td><td><code>aufgaben · ausbildung · kompetenzen · rahmendaten · benefits</code></td><td>universal across all roles (5.3.1)</td></tr>
+      <tr><td><code>german_level</code></td><td><code>A1 · A2 · B1 · B2 · C1 · C2 · Native</code></td><td>CEFR + native</td></tr>
+      <tr><td><code>must_have_state</code></td><td><code>true · partial · false</code></td><td>R4</td></tr>
+      <tr><td><code>criterion_status</code></td><td><code>yes · partial</code></td><td>cards only show met/partially-met criteria</td></tr>
+      <tr><td><code>source_channel</code></td><td><code>sophia · whatsapp · instagram · facebook · metaads</code></td><td><code>CHANNELS</code> registry incl. colors</td></tr>
+      <tr><td><code>position_status</code></td><td><code>open · in-progress · complete</code></td><td>header pill</td></tr>
+      <tr><td><code>focus_tag</code></td><td><code>interview · ready · screening · new</code></td><td>4.2.2 highlight tags</td></tr>
+      <tr><td><code>education_type</code></td><td><code>ausbildung · studium · lehre · weiterbildung</code></td><td>6.3.5</td></tr>
+    </tbody>
+  </table>
+
+  <h3>A.2 Drop-reason enum (4.3.2 / P6)</h3>
+  <table>
+    <thead><tr><th>Key</th><th>UI label</th></tr></thead>
+    <tbody>
+      <tr><td><code>salary_gap</code></td><td>Salary expectation gap</td></tr>
+      <tr><td><code>location</code></td><td>Location too far</td></tr>
+      <tr><td><code>skill_gap</code></td><td>Skill gap</td></tr>
+      <tr><td><code>not_interested</code></td><td>Not interested</td></tr>
+      <tr><td><code>no_response</code></td><td>No response</td></tr>
+      <tr><td><code>other</code></td><td>(not displayed in top-5 bars)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>A.3 File map — where each mock lives</h3>
+  <table class="filemap">
+    <thead><tr><th>File</th><th>Mock constants to replace</th></tr></thead>
+    <tbody>
+      <tr><td><code>src/lib/talentStore.ts</code></td><td><strong>The central one:</strong> <code>TALENT</code> (canonical candidates) + the in-memory stage store → becomes the <code>applications</code> API. <code>STAGES</code> (keep — the canonical enum).</td></tr>
+      <tr><td><code>src/dashboard/Dashboard.tsx</code></td><td><code>HERO_METRICS · POSITIONS · POSITION_PATH · PULSE_BY_TITLE · FOCUS_BY_TITLE · CRITERIA_BY_ID · AVAILABLE_BY_ID · WEEKLY_ACTIVITY_BY · DROPOFF_BY · CITY_COORDS · CANDIDATE_LOCATIONS_BY · STALL_DAYS (keep)</code></td></tr>
+      <tr><td><code>src/positions/PositionWorkspace.tsx</code></td><td><code>STATUS_PILL (keep) · PAGE_SIZE (keep) · JD_QUESTIONS · JD_SECTIONS · JD_FACTS · COMP_BUDGET · COMP_ROWS · GERMAN_RANK (keep) · MUST_DEFS</code></td></tr>
+      <tr><td><code>src/positions/PositionCandidateDetail.tsx</code></td><td>single layout (<code>ProfileFactsRail</code>) — resolves the back-link position from mock data</td></tr>
+      <tr><td><code>src/positions/components/profile/ProfileFactsRail.tsx</code></td><td>reads everything from the talent store — no local mocks left</td></tr>
+      <tr><td><code>src/positions/components/profile/CvDocument.tsx</code></td><td>pure rendering — no mocks beyond the candidate record</td></tr>
+      <tr><td><code>src/data/mockData.ts</code></td><td><code>mockCandidates · mockPositions</code> — becomes the API layer</td></tr>
+      <tr><td><code>src/index.css</code></td><td>keep: <code>.wandel-map-pop</code> (map popups) · <code>.page-top-fade</code> (scroll fade) · funnel/board animations</td></tr>
+    </tbody>
+  </table>
+
+  <h3>A.4 Suggested API surface (REST sketch)</h3>
+  <pre><code>GET    /clients/:id/dashboard            → hero metrics, focus cards, statistics, board (one aggregate)
+GET    /positions/:id                    → position + jd_bullets + screening_questions + hard facts
+GET    /positions/:id/applications       → paginated; ?stage=&amp;sort=&amp;page=   (table 5.1, comparison 5.2)
+PATCH  /applications/:id                 → { stage }   (board drag, evaluate dropdown)
+GET    /applications/:id                 → full profile payload (candidate + scores + assessment + Q&amp;A)
+POST   /applications/:id/notes           → { text }
+PUT    /positions/:id/questions          → recruiter-edited screening questions
+POST   /positions                        → raw JD → triggers P1 + P5</code></pre>
+
+  <p style="margin-top:40px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink-mute);">
+    End of handover · Generated 10 Jun 2026 · Questions → Tom
+  </p>
+</section>
+
+</div>
+</body>
+</html>
